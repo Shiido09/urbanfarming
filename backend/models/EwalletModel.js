@@ -22,3 +22,7 @@ const EwalletSchema = new mongoose.Schema({
     }
 
 });
+
+const EWallet = mongoose.model('EWallet', EwalletSchema);
+
+module.exports = EWallet;

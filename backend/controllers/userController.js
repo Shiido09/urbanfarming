@@ -239,17 +239,30 @@ const loginUser = async (req, res) => {
 // Get User Profile
 const getUserProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user._id)
-            .select('-password')
-            .populate('ewallets');
+        console.log('Fetching profile for user ID:', req.user._id);
+        
+        // First try without populate to see if the basic query works
+        let user = await User.findById(req.user._id).select('-password');
 
         if (!user) {
+            console.log('User not found with ID:', req.user._id);
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             });
         }
 
+        // Try to populate ewallets, but don't fail if it doesn't work
+        try {
+            user = await User.findById(req.user._id)
+                .select('-password')
+                .populate('ewallets');
+        } catch (populateError) {
+            console.warn('Could not populate ewallets:', populateError.message);
+            // Continue with user data without populated ewallets
+        }
+
+        console.log('Successfully fetched user profile');
         res.status(200).json({
             success: true,
             data: { user }
