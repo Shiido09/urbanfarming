@@ -297,10 +297,10 @@ const WalletSection = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-farm-red-100 text-sm">Default Wallet Balance</p>
-              <h2 className="text-3xl font-bold">${walletData.defaultWallet.toFixed(2)}</h2>
+              <h2 className="text-3xl font-bold">₱{walletData.defaultWallet.toFixed(2)}</h2>
             </div>
             <div className="text-4xl opacity-50">
-              <DollarSign className="w-12 h-12" />
+              <Wallet className="w-12 h-12" />
             </div>
           </div>
         </CardContent>
@@ -343,7 +343,7 @@ const WalletSection = () => {
                   <SelectContent>
                     {walletData.ewallets.map((ewallet) => (
                       <SelectItem key={ewallet._id} value={ewallet._id}>
-                        {getEwalletTypeIcon(ewallet.EwalletType)} {ewallet.EwalletType.toUpperCase()} - ${ewallet.AccountBalance.toFixed(2)}
+                        {getEwalletTypeIcon(ewallet.EwalletType)} {ewallet.EwalletType.toUpperCase()} - ₱{ewallet.AccountBalance.toFixed(2)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -392,7 +392,7 @@ const WalletSection = () => {
                   step="0.01"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Available: ${walletData.defaultWallet.toFixed(2)}
+                  Available: ₱{walletData.defaultWallet.toFixed(2)}
                 </p>
               </div>
               <div>
@@ -560,7 +560,7 @@ const WalletSection = () => {
                         </div>
                         <p className="text-sm text-gray-600">{ewallet.AccountHolderName}</p>
                         <p className="text-sm font-medium text-green-600">
-                          Balance: ${ewallet.AccountBalance.toFixed(2)}
+                          Balance: ₱{ewallet.AccountBalance.toFixed(2)}
                         </p>
                       </div>
                     </div>
