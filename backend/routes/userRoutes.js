@@ -9,7 +9,15 @@ const {
     changePassword,
     deleteUser,
     getAllUsers,
-    getUserById
+    getUserById,
+    getUserWallet,
+    cashIn,
+    cashOut,
+    connectEwallet,
+    disconnectEwallet,
+    createEwalletAccount,
+    getAvailableEwallets,
+    getEwalletsByType
 } = require('../controllers/userController');
 const {
     authenticateUser,
@@ -50,6 +58,20 @@ router.post('/login', loginUser);
 router.get('/profile', authenticateUser, getUserProfile);
 router.put('/profile', authenticateUser, updateUserProfile);
 router.put('/change-password', authenticateUser, changePassword);
+
+// Wallet routes
+router.get('/wallet', authenticateUser, getUserWallet);
+router.post('/wallet/cash-in', authenticateUser, cashIn);
+router.post('/wallet/cash-out', authenticateUser, cashOut);
+router.post('/wallet/connect', authenticateUser, connectEwallet);
+router.delete('/wallet/disconnect/:ewalletId', authenticateUser, disconnectEwallet);
+
+// E-wallet discovery routes
+router.get('/wallet/available-ewallets', authenticateUser, getAvailableEwallets);
+router.get('/wallet/ewallets/:type', authenticateUser, getEwalletsByType);
+
+// Public route for creating e-wallet accounts (for demo purposes)
+router.post('/wallet/create-account', createEwalletAccount);
 
 // Protected routes - Owner or Admin can access
 router.put('/:id', authenticateUser, authorizeOwnerOrAdmin, updateUserProfile);

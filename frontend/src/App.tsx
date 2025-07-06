@@ -22,6 +22,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import Notifications from "./pages/Notifications";
 import MyVouchers from "./pages/MyVouchers";
 import HarvestConnectCoins from "./pages/HarvestConnectCoins";
+import CreateWallet from "./pages/CreateWallet";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
@@ -55,6 +56,7 @@ const App = () => (
             <Route path="/profile/notifications" element={<Notifications />} />
             <Route path="/profile/vouchers" element={<MyVouchers />} />
             <Route path="/profile/coins" element={<HarvestConnectCoins />} />
+            <Route path="/create-wallet" element={<CreateWallet />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

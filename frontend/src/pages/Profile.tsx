@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import {
   ProfileSection,
+  WalletSection,
   BanksCardsSection,
   AddressesSection,
   ChangePasswordSection,
@@ -22,6 +23,8 @@ const Profile = () => {
     const tab = searchParams.get('tab');
     if (tab === 'purchase') {
       setActiveSection('purchase');
+    } else if (tab === 'wallet') {
+      setActiveSection('wallet');
     }
   }, [location]);
 
@@ -29,6 +32,8 @@ const Profile = () => {
     switch (activeSection) {
       case 'profile':
         return <ProfileSection />;
+      case 'wallet':
+        return <WalletSection />;
       case 'banks-cards':
         return <BanksCardsSection />;
       case 'addresses':

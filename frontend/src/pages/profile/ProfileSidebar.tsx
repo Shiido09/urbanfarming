@@ -6,7 +6,8 @@ import {
   CreditCard, 
   MapPin, 
   Lock, 
-  Package
+  Package,
+  Wallet
 } from "lucide-react";
 
 interface ProfileSidebarProps {
@@ -22,6 +23,7 @@ const ProfileSidebar = ({ activeSection, setActiveSection }: ProfileSidebarProps
       category: "My Account",
       items: [
         { id: 'profile', label: 'Profile', icon: User },
+        { id: 'wallet', label: 'My Wallet', icon: Wallet },
         { id: 'banks-cards', label: 'Banks & Cards', icon: CreditCard },
         { id: 'addresses', label: 'Addresses', icon: MapPin },
         { id: 'change-password', label: 'Change Password', icon: Lock },

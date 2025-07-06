@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/UserModel');
+const EWallet = require('../models/EwalletModel');
 const validator = require('validator');
 
 // Generate JWT Token
@@ -504,6 +505,462 @@ const getUserById = async (req, res) => {
     }
 };
 
+// Wallet Management Functions
+
+// Get user wallet info
+const getUserWallet = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id)
+            .select('defaultWallet ewallets')
+            .populate('ewallets');
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: {
+                defaultWallet: user.defaultWallet,
+                ewallets: user.ewallets
+            }
+        });
+
+    } catch (error) {
+        console.error('Get wallet error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error fetching wallet'
+        });
+    }
+};
+
+// Cash in to default wallet
+const cashIn = async (req, res) => {
+    try {
+        const { amount, ewalletId } = req.body;
+
+        // Validate input
+        if (!amount || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid amount'
+            });
+        }
+
+        if (!ewalletId) {
+            return res.status(400).json({
+                success: false,
+                message: 'E-wallet is required for cash in'
+            });
+        }
+
+        // Find user
+        const user = await User.findById(req.user._id).populate('ewallets');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Find the selected e-wallet
+        const selectedEwallet = user.ewallets.find(ewallet => ewallet._id.toString() === ewalletId);
+        if (!selectedEwallet) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-wallet not found or not associated with your account'
+            });
+        }
+
+        // Check if e-wallet has sufficient balance
+        if (selectedEwallet.AccountBalance < amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'Insufficient balance in selected e-wallet'
+            });
+        }
+
+        // Perform the transaction
+        selectedEwallet.AccountBalance -= amount;
+        user.defaultWallet += amount;
+
+        // Save both documents
+        await selectedEwallet.save();
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully cashed in $${amount} from ${selectedEwallet.EwalletType}`,
+            data: {
+                defaultWallet: user.defaultWallet,
+                ewalletBalance: selectedEwallet.AccountBalance
+            }
+        });
+
+    } catch (error) {
+        console.error('Cash in error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during cash in'
+        });
+    }
+};
+
+// Cash out from default wallet
+const cashOut = async (req, res) => {
+    try {
+        const { amount, ewalletId } = req.body;
+
+        // Validate input
+        if (!amount || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid amount'
+            });
+        }
+
+        if (!ewalletId) {
+            return res.status(400).json({
+                success: false,
+                message: 'E-wallet is required for cash out'
+            });
+        }
+
+        // Find user
+        const user = await User.findById(req.user._id).populate('ewallets');
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if user has sufficient balance in default wallet
+        if (user.defaultWallet < amount) {
+            return res.status(400).json({
+                success: false,
+                message: 'Insufficient balance in default wallet'
+            });
+        }
+
+        // Find the selected e-wallet
+        const selectedEwallet = user.ewallets.find(ewallet => ewallet._id.toString() === ewalletId);
+        if (!selectedEwallet) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-wallet not found or not associated with your account'
+            });
+        }
+
+        // Perform the transaction
+        user.defaultWallet -= amount;
+        selectedEwallet.AccountBalance += amount;
+
+        // Save both documents
+        await user.save();
+        await selectedEwallet.save();
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully cashed out $${amount} to ${selectedEwallet.EwalletType}`,
+            data: {
+                defaultWallet: user.defaultWallet,
+                ewalletBalance: selectedEwallet.AccountBalance
+            }
+        });
+
+    } catch (error) {
+        console.error('Cash out error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during cash out'
+        });
+    }
+};
+
+// Connect to existing e-wallet (verify account)
+const connectEwallet = async (req, res) => {
+    try {
+        const { AccountNumer, pin } = req.body;
+
+        // Validate input
+        if (!AccountNumer || !pin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Account number and PIN are required'
+            });
+        }
+
+        // Find the e-wallet account
+        const ewallet = await EWallet.findOne({ AccountNumer });
+        if (!ewallet) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-wallet account not found'
+            });
+        }
+
+        // Check if account is active
+        if (!ewallet.isActive) {
+            return res.status(400).json({
+                success: false,
+                message: 'This e-wallet account is inactive'
+            });
+        }
+
+        // Verify PIN
+        if (ewallet.pin !== pin) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid PIN'
+            });
+        }
+
+        // Find user
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if e-wallet is already connected to this user
+        if (user.ewallets.includes(ewallet._id)) {
+            return res.status(400).json({
+                success: false,
+                message: 'E-wallet is already connected to your account'
+            });
+        }
+
+        // Connect e-wallet to user
+        user.ewallets.push(ewallet._id);
+        await user.save();
+
+        // Add user to e-wallet's connected users (if not already there)
+        if (!ewallet.connectedUsers.includes(user._id)) {
+            ewallet.connectedUsers.push(user._id);
+            await ewallet.save();
+        }
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully connected ${ewallet.EwalletType} account`,
+            data: {
+                ewallet: {
+                    _id: ewallet._id,
+                    AccountNumer: ewallet.AccountNumer,
+                    AccountHolderName: ewallet.AccountHolderName,
+                    AccountBalance: ewallet.AccountBalance,
+                    EwalletType: ewallet.EwalletType
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Connect e-wallet error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error connecting e-wallet'
+        });
+    }
+};
+
+// Disconnect e-wallet from user account
+const disconnectEwallet = async (req, res) => {
+    try {
+        const { ewalletId } = req.params;
+
+        // Find user
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if e-wallet is connected to user
+        if (!user.ewallets.includes(ewalletId)) {
+            return res.status(404).json({
+                success: false,
+                message: 'E-wallet not connected to your account'
+            });
+        }
+
+        // Remove e-wallet from user's ewallets array
+        user.ewallets = user.ewallets.filter(id => id.toString() !== ewalletId);
+        await user.save();
+
+        // Remove user from e-wallet's connected users
+        const ewallet = await EWallet.findById(ewalletId);
+        if (ewallet) {
+            ewallet.connectedUsers = ewallet.connectedUsers.filter(
+                userId => userId.toString() !== req.user._id.toString()
+            );
+            await ewallet.save();
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'E-wallet disconnected successfully'
+        });
+
+    } catch (error) {
+        console.error('Disconnect e-wallet error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error disconnecting e-wallet'
+        });
+    }
+};
+
+// Admin function to create e-wallet accounts (for demo/setup purposes)
+const createEwalletAccount = async (req, res) => {
+    try {
+        const { AccountNumer, AccountHolderName, EwalletType, pin, AccountBalance } = req.body;
+
+        // Validate input
+        if (!AccountNumer || !AccountHolderName || !EwalletType || !pin) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+
+        // Validate PIN format
+        if (pin.length < 4 || pin.length > 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'PIN must be 4-6 digits'
+            });
+        }
+
+        // Check if account number already exists
+        const existingEwallet = await EWallet.findOne({ AccountNumer });
+        if (existingEwallet) {
+            return res.status(400).json({
+                success: false,
+                message: 'E-wallet account number already exists'
+            });
+        }
+
+        // Create new e-wallet account
+        const newEwallet = new EWallet({
+            AccountNumer,
+            AccountHolderName,
+            EwalletType,
+            pin,
+            AccountBalance: AccountBalance || 1000, // Default balance for demo
+            connectedUsers: []
+        });
+
+        await newEwallet.save();
+
+        res.status(201).json({
+            success: true,
+            message: 'E-wallet account created successfully',
+            data: {
+                _id: newEwallet._id,
+                AccountNumer: newEwallet.AccountNumer,
+                AccountHolderName: newEwallet.AccountHolderName,
+                AccountBalance: newEwallet.AccountBalance,
+                EwalletType: newEwallet.EwalletType
+            }
+        });
+
+    } catch (error) {
+        console.error('Create e-wallet account error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error creating e-wallet account'
+        });
+    }
+};
+
+// Get available e-wallets by type
+const getAvailableEwallets = async (req, res) => {
+    try {
+        // Get all active e-wallets grouped by type
+        const ewallets = await EWallet.find({ isActive: true })
+            .select('AccountNumer AccountHolderName EwalletType AccountBalance')
+            .sort({ EwalletType: 1, AccountNumer: 1 });
+
+        // Group by e-wallet type
+        const groupedEwallets = {};
+        ewallets.forEach(ewallet => {
+            if (!groupedEwallets[ewallet.EwalletType]) {
+                groupedEwallets[ewallet.EwalletType] = [];
+            }
+            groupedEwallets[ewallet.EwalletType].push({
+                _id: ewallet._id,
+                AccountNumer: ewallet.AccountNumer,
+                AccountHolderName: ewallet.AccountHolderName,
+                AccountBalance: ewallet.AccountBalance
+            });
+        });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                ewalletTypes: Object.keys(groupedEwallets),
+                ewallets: groupedEwallets,
+                totalCount: ewallets.length
+            }
+        });
+
+    } catch (error) {
+        console.error('Get available e-wallets error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error fetching available e-wallets'
+        });
+    }
+};
+
+// Get e-wallets by specific type
+const getEwalletsByType = async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        // Validate e-wallet type
+        const validTypes = ['gcash', 'paypal', 'bdo', 'paymaya', 'unionbank', 'bpi'];
+        if (!validTypes.includes(type.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid e-wallet type'
+            });
+        }
+
+        const ewallets = await EWallet.find({ 
+            EwalletType: type.toLowerCase(), 
+            isActive: true 
+        })
+        .select('AccountNumer AccountHolderName AccountBalance')
+        .sort({ AccountNumer: 1 });
+
+        res.status(200).json({
+            success: true,
+            data: {
+                type: type.toLowerCase(),
+                ewallets: ewallets,
+                count: ewallets.length
+            }
+        });
+
+    } catch (error) {
+        console.error('Get e-wallets by type error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error fetching e-wallets by type'
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -512,5 +969,13 @@ module.exports = {
     changePassword,
     deleteUser,
     getAllUsers,
-    getUserById
+    getUserById,
+    getUserWallet,
+    cashIn,
+    cashOut,
+    connectEwallet,
+    disconnectEwallet,
+    createEwalletAccount,
+    getAvailableEwallets,
+    getEwalletsByType
 };

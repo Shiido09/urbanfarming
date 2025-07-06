@@ -12,7 +12,14 @@ const app = express();
 
 // CORS middleware - must be first
 app.use(cors({
-  origin: ['http://localhost:8080', 'http://localhost:3000'], // Add your frontend URLs
+  origin: [
+    'http://localhost:8080', 
+    'http://localhost:3000',
+    'http://192.168.1.9:8080', // Network IP
+    /^http:\/\/192\.168\.\d+\.\d+:8080$/, // Allow any local network IP on port 8080
+    /^http:\/\/10\.\d+\.\d+\.\d+:8080$/, // Allow 10.x.x.x network
+    /^http:\/\/172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+:8080$/ // Allow 172.16-31.x.x network
+  ],
   credentials: true
 }));
 
@@ -37,6 +44,17 @@ app.get('/', (req, res) => {
   res.send('HarvestConnect API is working!');
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'HarvestConnect API is healthy',
+    timestamp: new Date().toISOString(),
+    server: 'HarvestConnect Backend'
+  });
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Network access: http://192.168.1.9:${PORT}`);
 });
