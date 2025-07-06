@@ -3,7 +3,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   User, 
-  CreditCard, 
+  Package2, 
   MapPin, 
   Lock, 
   Package,
@@ -24,7 +24,7 @@ const ProfileSidebar = ({ activeSection, setActiveSection }: ProfileSidebarProps
       items: [
         { id: 'profile', label: 'Profile', icon: User },
         { id: 'wallet', label: 'My Wallet', icon: Wallet },
-        { id: 'banks-cards', label: 'Banks & Cards', icon: CreditCard },
+        { id: 'my-products', label: 'My Products', icon: Package2 },
         { id: 'addresses', label: 'Addresses', icon: MapPin },
         { id: 'change-password', label: 'Change Password', icon: Lock },
       ]

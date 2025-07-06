@@ -6,7 +6,7 @@ import { useLocation } from "react-router-dom";
 import {
   ProfileSection,
   WalletSection,
-  BanksCardsSection,
+  MyProductsSection,
   AddressesSection,
   ChangePasswordSection,
   PurchaseSection,
@@ -34,8 +34,8 @@ const Profile = () => {
         return <ProfileSection />;
       case 'wallet':
         return <WalletSection />;
-      case 'banks-cards':
-        return <BanksCardsSection />;
+      case 'my-products':
+        return <MyProductsSection />;
       case 'addresses':
         return <AddressesSection />;
       case 'change-password':

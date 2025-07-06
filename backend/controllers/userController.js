@@ -11,13 +11,7 @@ const generateToken = (userId) => {
 
 // Register User
 const registerUser = async (req, res) => {
-    try {
-        console.log('=== REGISTER USER REQUEST ===');
-        console.log('Request body:', req.body);
-        console.log('Request file:', req.file);
-        console.log('Body keys:', Object.keys(req.body));
-        console.log('Content-Type:', req.headers['content-type']);
-        
+    try {       
         const { 
             name, 
             email, 
@@ -28,17 +22,6 @@ const registerUser = async (req, res) => {
             dateOfBirth,
             role = 'user' 
         } = req.body;
-
-        console.log('Extracted fields:', {
-            name,
-            email,
-            address,
-            phone_number,
-            password: password ? '[PROVIDED]' : '[MISSING]',
-            gender,
-            dateOfBirth,
-            role
-        });
 
         // Validation
         if (!name || !email || !address || !phone_number || !password || !gender || !dateOfBirth) {
@@ -119,18 +102,6 @@ const registerUser = async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Log user data before creation
-        console.log('Creating user with data:', {
-            name,
-            email,
-            address,
-            phone_number,
-            gender,
-            dateOfBirth: birthDate,
-            role,
-            profilePicture,
-            hasProfilePicture: !!req.file
-        });
 
         // Create user
         const user = new User({
@@ -145,9 +116,7 @@ const registerUser = async (req, res) => {
             profilePicture
         });
 
-        console.log('User object before save:', user);
         await user.save();
-        console.log('User saved successfully with ID:', user._id);
 
         // Generate token
         const token = generateToken(user._id);
@@ -166,11 +135,6 @@ const registerUser = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Registration error:', error);
-        console.error('Error stack:', error.stack);
-        console.error('Error message:', error.message);
-        console.error('Request body:', req.body);
-        console.error('Request file:', req.file);
         
         res.status(500).json({
             success: false,

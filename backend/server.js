@@ -5,6 +5,7 @@ const connectDB = require('./config/database');
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
+const productRoutes = require('./routes/productRoute');
 
 connectDB();
 
@@ -37,6 +38,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes (multer middleware will handle multipart/form-data)
 app.use('/api/users', userRoutes);
+app.use('/api/products', productRoutes);
 
 const PORT = process.env.PORT || 5000;
 

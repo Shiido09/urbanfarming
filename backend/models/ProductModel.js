@@ -15,10 +15,18 @@ const productSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    productImage: {
-        type: [String],
-        required: true
-    },
+    productimage: [
+    {
+        public_id: {
+        type: String,
+        required: false,
+        },
+        url: {
+        type: String,
+        required: false,
+        }
+    }
+    ],
     productCategory: {
         type: String,
         required: true
@@ -40,5 +48,7 @@ const productSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
-      },
+    }
 });
+
+module.exports = mongoose.model('Product', productSchema);

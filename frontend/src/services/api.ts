@@ -144,6 +144,39 @@ export const walletAPI = {
   },
 };
 
+// Products API calls
+export const productsAPI = {
+  getAllProducts: async () => {
+    const response = await api.get('/products');
+    return response.data;
+  },
+
+  getMyProducts: async () => {
+    const response = await api.get('/products/my-products');
+    return response.data;
+  },
+
+  getProductById: async (productId) => {
+    const response = await api.get(`/products/${productId}`);
+    return response.data;
+  },
+
+  createProduct: async (productData) => {
+    const response = await api.post('/products', productData);
+    return response.data;
+  },
+
+  updateProduct: async (productId, productData) => {
+    const response = await api.put(`/products/${productId}`, productData);
+    return response.data;
+  },
+
+  deleteProduct: async (productId) => {
+    const response = await api.delete(`/products/${productId}`);
+    return response.data;
+  },
+};
+
 // Auth helper functions
 export const auth = {
   // Save user data and token to localStorage
