@@ -296,6 +296,63 @@ const addRating = async (req, res) => {
     }
 };
 
+// Get seller statistics
+const getSellerStats = async (req, res) => {
+    try {
+        const sellerId = req.params.sellerId;
+
+        // Get all products by this seller
+        const products = await Product.find({ user: sellerId });
+
+        if (products.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    totalProducts: 0,
+                    averageRating: 0,
+                    totalRatings: 0,
+                    totalSold: 0
+                }
+            });
+        }
+
+        // Calculate statistics
+        const totalProducts = products.length;
+        const totalSold = products.reduce((sum, product) => sum + (product.totalSold || 0), 0);
+        
+        // Calculate overall rating across all products
+        let totalRatingSum = 0;
+        let totalRatingCount = 0;
+        
+        products.forEach(product => {
+            if (product.ratings && product.ratings.length > 0) {
+                product.ratings.forEach(rating => {
+                    totalRatingSum += rating.rating;
+                    totalRatingCount++;
+                });
+            }
+        });
+
+        const averageRating = totalRatingCount > 0 ? totalRatingSum / totalRatingCount : 0;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                totalProducts,
+                averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal place
+                totalRatings: totalRatingCount,
+                totalSold
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching seller stats:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching seller statistics'
+        });
+    }
+};
+
 module.exports = {
     getAllProducts,
     getProductById,
@@ -303,5 +360,6 @@ module.exports = {
     createProduct,
     updateProduct,
     deleteProduct,
-    addRating
+    addRating,
+    getSellerStats
 };

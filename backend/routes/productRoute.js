@@ -6,6 +6,7 @@ const upload = require('../middleware/upload');
 
 // Public routes
 router.get('/', productController.getAllProducts);
+router.get('/seller/:sellerId/stats', productController.getSellerStats);
 router.get('/:id', productController.getProductById);
 
 // Protected routes (require authentication)
@@ -22,5 +23,8 @@ router.put('/:id', upload.array('productimage', 5), productController.updateProd
 
 // Delete product
 router.delete('/:id', productController.deleteProduct);
+
+// Add rating to product
+router.post('/:id/rating', productController.addRating);
 
 module.exports = router;

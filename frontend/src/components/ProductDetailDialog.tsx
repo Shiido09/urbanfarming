@@ -2,7 +2,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Star, ShoppingCart, Clock, User, Heart, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { productsAPI } from "@/services/api";
 
 interface Product {
   _id: string;
@@ -40,8 +42,37 @@ interface ProductDetailDialogProps {
 }
 
 const ProductDetailDialog = ({ product, isOpen, onClose }: ProductDetailDialogProps) => {
+  const navigate = useNavigate();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
+  const [sellerStats, setSellerStats] = useState({
+    totalProducts: 0,
+    averageRating: 0,
+    totalRatings: 0,
+    totalSold: 0
+  });
+  const [loadingStats, setLoadingStats] = useState(false);
+
+  // Fetch seller statistics when product changes
+  useEffect(() => {
+    if (product?.user?._id) {
+      fetchSellerStats(product.user._id);
+    }
+  }, [product?.user?._id]);
+
+  const fetchSellerStats = async (sellerId: string) => {
+    try {
+      setLoadingStats(true);
+      const response = await productsAPI.getSellerStats(sellerId);
+      if (response.success) {
+        setSellerStats(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching seller stats:', error);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   if (!product) return null;
 
@@ -203,6 +234,52 @@ const ProductDetailDialog = ({ product, isOpen, onClose }: ProductDetailDialogPr
                 <ShoppingCart className="w-4 h-4 mr-2" />
                 {product.productStock === 0 ? 'Out of Stock' : 'Add to Cart'}
               </Button>
+            </div>
+
+            {/* Store/Seller Information */}
+            <div className="pt-4 border-t">
+              <h4 className="font-semibold text-gray-800 mb-3">Store Information</h4>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                    <User className="w-6 h-6 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h5 className="font-medium text-gray-800">{product.user?.name || 'Unknown Store'}</h5>
+                    <p className="text-xs text-gray-500 mb-2">{product.user?.email || 'No contact info'}</p>
+                    
+                    <div className="flex items-center space-x-4 text-xs text-gray-600 mb-3">
+                      <div className="flex items-center space-x-1">
+                        <span className="font-medium">Products:</span>
+                        <span>{loadingStats ? 'Loading...' : sellerStats.totalProducts}</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="font-medium">Rating:</span>
+                        <div className="flex items-center space-x-1">
+                          {renderStars(sellerStats.averageRating)}
+                          <span>({sellerStats.averageRating.toFixed(1)})</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <span className="font-medium">Sold:</span>
+                        <span>{sellerStats.totalSold}</span>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full border-red-600 text-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        onClose(); // Close the dialog first
+                        navigate(`/store/${product.user._id}`); // Navigate to store page
+                      }}
+                    >
+                      Visit Store
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Reviews Section */}

@@ -175,6 +175,16 @@ export const productsAPI = {
     const response = await api.delete(`/products/${productId}`);
     return response.data;
   },
+
+  getSellerStats: async (sellerId) => {
+    const response = await api.get(`/products/seller/${sellerId}/stats`);
+    return response.data;
+  },
+
+  addRating: async (productId, ratingData) => {
+    const response = await api.post(`/products/${productId}/rating`, ratingData);
+    return response.data;
+  },
 };
 
 // Auth helper functions
