@@ -152,7 +152,7 @@ export const productsAPI = {
   },
 
   getMyProducts: async () => {
-    const response = await api.get('/products/my-products');
+    const response = await api.get('/products/user/my-products');
     return response.data;
   },
 

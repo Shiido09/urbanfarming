@@ -84,8 +84,8 @@ const createProduct = async (req, res) => {
         let productImages = [];
         if (req.files && req.files.length > 0) {
             productImages = req.files.map(file => ({
-                public_id: file.public_id || file.filename,
-                url: file.secure_url || file.path
+                public_id: file.filename,
+                url: file.path
             }));
         }
 
@@ -158,8 +158,8 @@ const updateProduct = async (req, res) => {
         // Process new images if uploaded
         if (req.files && req.files.length > 0) {
             const newImages = req.files.map(file => ({
-                public_id: file.public_id || file.filename,
-                url: file.secure_url || file.path
+                public_id: file.filename,
+                url: file.path
             }));
             product.productimage = [...product.productimage, ...newImages];
         }

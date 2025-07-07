@@ -6,15 +6,13 @@ const upload = require('../middleware/upload');
 
 // Public routes
 router.get('/', productController.getAllProducts);
+router.get('/:id', productController.getProductById);
 
 // Protected routes (require authentication)
 router.use(authenticateUser);
 
-// User's own products (must come before /:id route)
-router.get('/my-products', productController.getMyProducts);
-
-// Other protected routes
-router.get('/:id', productController.getProductById);
+// User's own products
+router.get('/user/my-products', productController.getMyProducts);
 
 // Create product with image upload
 router.post('/', upload.array('productimage', 5), productController.createProduct);
