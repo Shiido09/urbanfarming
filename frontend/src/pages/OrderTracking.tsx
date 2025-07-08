@@ -15,44 +15,124 @@ import {
   MessageCircle,
   Star
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { orderAPI, auth } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const OrderTracking = () => {
-  const orderStatus = {
-    current: "out-for-delivery",
-    steps: [
-      { id: "confirmed", label: "Order Confirmed", completed: true, time: "10:30 AM" },
-      { id: "packed", label: "Packed", completed: true, time: "11:45 AM" },
-      { id: "shipped", label: "Shipped", completed: true, time: "2:15 PM" },
-      { id: "out-for-delivery", label: "Out for Delivery", completed: true, time: "8:30 AM", active: true },
+  const { orderId } = useParams();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrder = async () => {
+      if (!auth.isAuthenticated()) {
+        navigate('/login');
+        return;
+      }
+
+      if (!orderId) {
+        toast({
+          title: "No order specified",
+          description: "Please select an order to track",
+          variant: "destructive",
+        });
+        navigate('/profile');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await orderAPI.getOrderById(orderId);
+        
+        if (response.success) {
+          setOrder(response.data);
+        } else {
+          toast({
+            title: "Order not found",
+            description: "The order you're looking for doesn't exist",
+            variant: "destructive",
+          });
+          navigate('/profile');
+        }
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load order details",
+          variant: "destructive",
+        });
+        navigate('/profile');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrder();
+  }, [orderId, navigate]);
+
+  const getOrderStatusSteps = (status) => {
+    const baseSteps = [
+      { id: "pending", label: "Order Confirmed", completed: false, time: "" },
+      { id: "processing", label: "Packed", completed: false, time: "" },
+      { id: "shipped", label: "Shipped", completed: false, time: "" },
+      { id: "out_for_delivery", label: "Out for Delivery", completed: false, time: "", active: false },
       { id: "delivered", label: "Delivered", completed: false, time: "" }
-    ]
+    ];
+
+    const statusOrder = ["pending", "processing", "shipped", "out_for_delivery", "delivered"];
+    const currentIndex = statusOrder.indexOf(status);
+
+    return baseSteps.map((step, index) => ({
+      ...step,
+      completed: index <= currentIndex,
+      active: index === currentIndex && status !== "delivered",
+      time: index <= currentIndex ? "Completed" : ""
+    }));
   };
 
-  const courierInfo = {
-    name: "SPX Express",
-    phone: "+63 912 345 6789",
-    rating: 4.8,
-    vehicle: "Motorcycle",
-    plateNumber: "ABC 1234"
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { color: "bg-yellow-100 text-yellow-800", label: "Confirmed" },
+      processing: { color: "bg-blue-100 text-blue-800", label: "Processing" },
+      shipped: { color: "bg-purple-100 text-purple-800", label: "Shipped" },
+      out_for_delivery: { color: "bg-orange-100 text-orange-800", label: "Out for Delivery" },
+      delivered: { color: "bg-green-100 text-green-800", label: "Delivered" },
+      cancelled: { color: "bg-red-100 text-red-800", label: "Cancelled" }
+    };
+    
+    return statusConfig[status] || { color: "bg-gray-100 text-gray-800", label: "Unknown" };
   };
 
-  const orderItems = [
-    {
-      id: 1,
-      name: "Organic Tomatoes",
-      quantity: 2,
-      price: "₱8.99",
-      image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=100&h=100&fit=crop&crop=center"
-    },
-    {
-      id: 2,
-      name: "Fresh Herbs Bundle",
-      quantity: 1,
-      price: "₱15.99",
-      image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop&crop=center"
-    }
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <p className="text-center text-gray-600">Loading order details...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <p className="text-center text-gray-600">Order not found</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const orderStatus = getOrderStatusSteps(order.status);
+  const statusBadge = getStatusBadge(order.status);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -80,21 +160,36 @@ const OrderTracking = () => {
               <div className="absolute inset-0 bg-gray-200 flex items-center justify-center">
                 <div className="text-center">
                   <Truck className="w-12 h-12 text-red-600 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Out for Delivery</p>
-                  <p className="text-xs text-gray-500">Your order is on the way!</p>
+                  <p className="text-sm text-gray-600">{statusBadge.label}</p>
+                  <p className="text-xs text-gray-500">
+                    {order.status === 'delivered' ? 'Your order has been delivered!' : 
+                     order.status === 'out_for_delivery' ? 'Your order is on the way!' :
+                     'Your order is being processed'}
+                  </p>
                 </div>
               </div>
               <div className="absolute top-4 left-4 bg-white px-3 py-1 rounded-full shadow-sm">
-                <span className="text-sm font-medium">Order #HV12345</span>
+                <span className="text-sm font-medium">Order #{order._id.slice(-8)}</span>
               </div>
             </div>
             
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-green-600">Estimated delivery date: Today</h3>
-                <Badge className="bg-green-100 text-green-800">On Time</Badge>
+                <h3 className="font-semibold text-green-600">
+                  {order.status === 'delivered' ? 'Delivered' : 
+                   order.status === 'out_for_delivery' ? 'Estimated delivery: Today' :
+                   'Processing your order'}
+                </h3>
+                <Badge className={statusBadge.color}>{statusBadge.label}</Badge>
               </div>
-              <p className="text-sm text-gray-600">Expected delivery: 12:00 PM - 2:00 PM</p>
+              <p className="text-sm text-gray-600">
+                Order placed: {new Date(order.createdAt).toLocaleDateString()}
+              </p>
+              {order.shipping && order.shipping.courier && (
+                <p className="text-sm text-gray-600">
+                  Courier: {order.shipping.courier.name} - {order.shipping.courier.estimatedDelivery}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -104,7 +199,7 @@ const OrderTracking = () => {
           <CardContent className="p-6">
             <h3 className="font-semibold mb-4">Order Progress</h3>
             <div className="space-y-4">
-              {orderStatus.steps.map((step, index) => (
+              {orderStatus.map((step, index) => (
                 <div key={step.id} className="flex items-center space-x-4">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                     step.completed 
@@ -134,40 +229,50 @@ const OrderTracking = () => {
         </Card>
 
         {/* Courier Information */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Courier Information</h3>
-              <Badge className="bg-blue-100 text-blue-800">{courierInfo.name}</Badge>
-            </div>
-            
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold">SPX</span>
+        {order.shipping && order.shipping.courier && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Courier Information</h3>
+                <Badge className="bg-blue-100 text-blue-800">{order.shipping.courier.name}</Badge>
               </div>
-              <div className="flex-1">
-                <p className="font-medium">{courierInfo.name}</p>
-                <div className="flex items-center space-x-2">
-                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  <span className="text-sm text-gray-600">{courierInfo.rating}</span>
-                  <span className="text-sm text-gray-400">• {courierInfo.vehicle}</span>
+              
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold">
+                    {order.shipping.courier.name.split(' ').map(word => word[0]).join('')}
+                  </span>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{order.shipping.courier.name}</p>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600">Fee: ₱{order.shipping.fee}</span>
+                    <span className="text-sm text-gray-400">• {order.shipping.courier.estimatedDelivery}</span>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <Button size="sm" variant="outline">
+                    <Phone className="w-4 h-4" />
+                  </Button>
+                  <Button size="sm" variant="outline">
+                    <MessageCircle className="w-4 h-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex space-x-2">
-                <Button size="sm" variant="outline">
-                  <Phone className="w-4 h-4" />
-                </Button>
-                <Button size="sm" variant="outline">
-                  <MessageCircle className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Vehicle Plate:</span>
-                <span className="font-medium">{courierInfo.plateNumber}</span>
-              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Shipping Address */}
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="font-semibold mb-4">Shipping Address</h3>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="font-medium">{order.shipping.address.fullName}</p>
+              <p className="text-sm text-gray-600">{order.shipping.address.phoneNumber}</p>
+              <p className="text-sm text-gray-600">
+                {order.shipping.address.address}, {order.shipping.address.city}, {order.shipping.address.postalCode}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -176,39 +281,60 @@ const OrderTracking = () => {
         <Card>
           <CardContent className="p-6">
             <h3 className="font-semibold mb-4">Order Items</h3>
-            <div className="space-y-3">
-              {orderItems.map((item) => (
-                <div key={item.id} className="flex items-center space-x-3">
+            <div className="space-y-3 mb-4">
+              {order.products.map((item) => (
+                <div key={item._id} className="flex items-center space-x-3">
                   <img 
-                    src={item.image}
-                    alt={item.name}
+                    src={item.product.productimage && item.product.productimage.length > 0 ? 
+                         item.product.productimage[0].url : "/placeholder.svg"}
+                    alt={item.product.productName}
                     className="w-12 h-12 object-cover rounded"
                   />
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{item.name}</p>
+                    <p className="font-medium text-sm">{item.product.productName}</p>
                     <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                   </div>
-                  <span className="font-medium text-red-600">{item.price}</span>
+                  <span className="font-medium text-red-600">₱{(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
+            </div>
+            
+            {/* Order Summary */}
+            <div className="border-t pt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Subtotal</span>
+                <span>₱{order.subtotal.toFixed(2)}</span>
+              </div>
+              {order.shipping && (
+                <div className="flex justify-between text-sm">
+                  <span>Shipping</span>
+                  <span>₱{order.shipping.fee.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold text-red-600">
+                <span>Total</span>
+                <span>₱{order.totalAmount.toFixed(2)}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Delivery Guarantee */}
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-white" />
+        {/* Order Actions */}
+        {order.orderStatus !== 'delivered' && order.orderStatus !== 'cancelled' && (
+          <Card className="border-green-200 bg-green-50">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-green-800">Order Protection</p>
+                  <p className="text-sm text-green-600">Your order is protected. Contact us if you have any issues.</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-green-800">Guaranteed On-Time Delivery</p>
-                <p className="text-sm text-green-600">Get a ₱50 voucher if no delivery was attempted by 2:00 PM today.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Footer />

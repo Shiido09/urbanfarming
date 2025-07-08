@@ -3,70 +3,148 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Package } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { orderAPI, auth } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 const PurchaseSection = () => {
   const [activePurchaseStatus, setActivePurchaseStatus] = useState('all');
+  const [orders, setOrders] = useState([]);
+  const [filteredOrders, setFilteredOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Fetch user orders from backend
+  useEffect(() => {
+    const fetchOrders = async () => {
+      if (!auth.isAuthenticated()) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await orderAPI.getUserOrders();
+        
+        if (response.success) {
+          setOrders(response.data || []);
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to load your orders",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching orders:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load your orders",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  // Filter orders based on status and search query
+  useEffect(() => {
+    let filtered = orders;
+
+    // Filter by status
+    if (activePurchaseStatus !== 'all') {
+      const statusMap = {
+        'to-pay': ['pending'],
+        'to-ship': ['confirmed', 'processing'],
+        'shipped': ['shipped'],
+        'completed': ['delivered']
+      };
+      
+      filtered = filtered.filter(order => 
+        statusMap[activePurchaseStatus]?.includes(order.orderStatus)
+      );
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(order =>
+        order._id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.products.some(item => 
+          item.product.productName.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      );
+    }
+
+    setFilteredOrders(filtered);
+  }, [orders, activePurchaseStatus, searchQuery]);
+
+  // Calculate status counts
+  const getStatusCounts = () => {
+    const counts = {
+      all: orders.length,
+      'to-pay': orders.filter(order => ['pending'].includes(order.orderStatus)).length,
+      'to-ship': orders.filter(order => ['confirmed', 'processing'].includes(order.orderStatus)).length,
+      'shipped': orders.filter(order => ['shipped'].includes(order.orderStatus)).length,
+      'completed': orders.filter(order => ['delivered'].includes(order.orderStatus)).length,
+    };
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
   
   const purchaseStatuses = [
-    { id: 'all', name: 'All', count: 5 },
-    { id: 'to-pay', name: 'To Pay', count: 2 },
-    { id: 'to-ship', name: 'To Ship', count: 1 },
-    { id: 'completed', name: 'Completed', count: 2 },
+    { id: 'all', name: 'All', count: statusCounts.all },
+    { id: 'to-pay', name: 'To Pay', count: statusCounts['to-pay'] },
+    { id: 'to-ship', name: 'To Ship', count: statusCounts['to-ship'] },
+    { id: 'shipped', name: 'Shipped', count: statusCounts.shipped },
+    { id: 'completed', name: 'Completed', count: statusCounts.completed },
   ];
 
-  const sampleOrders = [
-    {
-      id: 1,
-      date: '2024-04-28',
-      product: 'Organic Tomatoes',
-      seller: 'Sarah\'s Garden',
-      quantity: 2,
-      total: '₱17.98',
-      status: 'Completed',
-      image: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop&crop=center'
-    },
-    {
-      id: 2,
-      date: '2024-04-27',
-      product: 'Fresh Herbs Bundle',
-      seller: 'Green Thumb Co.',
-      quantity: 1,
-      total: '₱15.99',
-      status: 'To Ship',
-      image: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=300&h=300&fit=crop&crop=center'
-    },
-    {
-      id: 3,
-      date: '2024-04-26',
-      product: 'Mixed Vegetables',
-      seller: 'Urban Harvest',
-      quantity: 1,
-      total: '₱22.50',
-      status: 'To Pay',
-      image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=300&h=300&fit=crop&crop=center'
-    },
-    {
-      id: 4,
-      date: '2024-04-25',
-      product: 'Leafy Greens Pack',
-      seller: 'Backyard Bounty',
-      quantity: 1,
-      total: '₱12.99',
-      status: 'Completed',
-      image: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=300&h=300&fit=crop&crop=center'
-    },
-    {
-      id: 5,
-      date: '2024-04-24',
-      product: 'Seasonal Fruit Box',
-      seller: 'Orchard Dreams',
-      quantity: 1,
-      total: '₱34.99',
-      status: 'To Pay',
-      image: 'https://images.unsplash.com/photo-1472396961693-142e6e269027?w=300&h=300&fit=crop&crop=center'
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      pending: { color: 'bg-yellow-100 text-yellow-800', label: 'To Pay' },
+      confirmed: { color: 'bg-blue-100 text-blue-800', label: 'Confirmed' },
+      processing: { color: 'bg-purple-100 text-purple-800', label: 'Processing' },
+      shipped: { color: 'bg-orange-100 text-orange-800', label: 'Shipped' },
+      delivered: { color: 'bg-green-100 text-green-800', label: 'Delivered' },
+      cancelled: { color: 'bg-red-100 text-red-800', label: 'Cancelled' }
+    };
+    
+    return statusConfig[status] || { color: 'bg-gray-100 text-gray-800', label: 'Unknown' };
+  };
+
+  const handleViewDetails = (orderId) => {
+    navigate(`/order-tracking/${orderId}`);
+  };
+
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getProductImage = (product) => {
+    if (product.productimage && product.productimage.length > 0) {
+      return product.productimage[0].url;
     }
-  ];
+    return "/placeholder.svg";
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-gray-600">Loading your orders...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -76,6 +154,8 @@ const PurchaseSection = () => {
           <Input
             placeholder="Search orders..."
             className="w-64 pr-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
         </div>
@@ -90,13 +170,13 @@ const PurchaseSection = () => {
               onClick={() => setActivePurchaseStatus(status.id)}
               className={`py-3 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                 activePurchaseStatus === status.id
-                  ? 'border-farm-red-600 text-farm-red-600'
+                  ? 'border-red-600 text-red-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
               {status.name}
               {status.count > 0 && (
-                <Badge className="ml-2 bg-farm-red-100 text-farm-red-800 text-xs">
+                <Badge className="ml-2 bg-red-100 text-red-800 text-xs">
                   {status.count}
                 </Badge>
               )}
@@ -107,72 +187,101 @@ const PurchaseSection = () => {
 
       {/* Purchase Orders */}
       <div className="space-y-4">
-        {sampleOrders
-          .filter(order => 
-            activePurchaseStatus === 'all' || 
-            order.status.toLowerCase().replace(' ', '-') === activePurchaseStatus
-          )
-          .map((order) => (
-            <Card key={order.id} className="border border-gray-200">
+        {filteredOrders.map((order) => {
+          const statusBadge = getStatusBadge(order.orderStatus);
+          const firstProduct = order.products[0]; // Show first product in the order
+          const totalProducts = order.products.length;
+          
+          return (
+            <Card key={order._id} className="border border-gray-200">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">Order #{order.id}</span>
-                    <Badge className={`${
-                      order.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                      order.status === 'To Ship' ? 'bg-blue-100 text-blue-800' :
-                      order.status === 'To Pay' ? 'bg-farm-red-100 text-farm-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {order.status}
+                    <span className="text-sm text-gray-600">Order #{order._id.slice(-8)}</span>
+                    <Badge className={statusBadge.color}>
+                      {statusBadge.label}
                     </Badge>
                   </div>
-                  <span className="text-sm text-gray-600">{order.date}</span>
+                  <span className="text-sm text-gray-600">{formatDate(order.createdAt)}</span>
                 </div>
                 
                 <div className="flex items-center space-x-4">
                   <img 
-                    src={order.image} 
-                    alt={order.product}
+                    src={getProductImage(firstProduct.product)}
+                    alt={firstProduct.product.productName}
                     className="w-16 h-16 object-cover rounded-lg"
                   />
                   <div className="flex-1">
-                    <h4 className="font-medium text-gray-800">{order.product}</h4>
-                    <p className="text-sm text-gray-600">from {order.seller}</p>
-                    <p className="text-sm text-gray-600">Qty: {order.quantity}</p>
+                    <h4 className="font-medium text-gray-800">
+                      {firstProduct.product.productName}
+                      {totalProducts > 1 && (
+                        <span className="text-sm text-gray-500 ml-2">
+                          +{totalProducts - 1} more item{totalProducts > 2 ? 's' : ''}
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-gray-600">
+                      Total items: {order.products.reduce((sum, item) => sum + item.quantity, 0)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Payment: {order.paymentMethod.toUpperCase()}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-800">{order.total}</p>
+                    <p className="font-semibold text-gray-800">₱{order.totalAmount.toFixed(2)}</p>
                     <div className="flex space-x-2 mt-2">
-                      {order.status === 'Completed' && (
+                      {order.orderStatus === 'delivered' && (
                         <Button size="sm" variant="outline" className="text-xs">
                           Rate & Review
                         </Button>
                       )}
-                      {order.status === 'To Pay' && (
-                        <Button size="sm" className="bg-farm-red-600 hover:bg-farm-red-700 text-white text-xs">
+                      {order.orderStatus === 'pending' && (
+                        <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white text-xs">
                           Pay Now
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" className="text-xs">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-xs"
+                        onClick={() => handleViewDetails(order._id)}
+                      >
                         View Details
                       </Button>
                     </div>
                   </div>
                 </div>
+                
+                {/* Order Summary */}
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <div className="flex items-center space-x-4">
+                      <span>Subtotal: ₱{order.subtotal.toFixed(2)}</span>
+                      {order.shipping && (
+                        <span>Shipping: ₱{order.shipping.fee.toFixed(2)}</span>
+                      )}
+                    </div>
+                    {order.shipping?.courier && (
+                      <span>via {order.shipping.courier.name}</span>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
-          ))}
+          );
+        })}
       </div>
       
-      {sampleOrders.filter(order => 
-        activePurchaseStatus === 'all' || 
-        order.status.toLowerCase().replace(' ', '-') === activePurchaseStatus
-      ).length === 0 && (
+      {filteredOrders.length === 0 && !loading && (
         <div className="text-center py-12">
           <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-500 mb-2">No orders found</h3>
-          <p className="text-gray-400">You haven't made any orders in this category yet.</p>
+          <p className="text-gray-400">
+            {searchQuery ? 
+              'No orders match your search criteria.' : 
+              "You haven't made any orders in this category yet."
+            }
+          </p>
         </div>
       )}
     </div>

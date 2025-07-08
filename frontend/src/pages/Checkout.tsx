@@ -10,67 +10,196 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { 
   CreditCard, 
-  Truck, 
   MapPin, 
-  Clock,
-  Star,
   Shield 
 } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { cartAPI, orderAPI, walletAPI, auth } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
+
+interface PaymentMethod {
+  type: string;
+  ewalletDetails?: {
+    ewalletId: string;
+    accountNumber: string;
+    ewalletType: string;
+  };
+}
 
 const Checkout = () => {
-  const [selectedCourier, setSelectedCourier] = useState("spx");
-  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>({ type: 'cod' });
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [placing, setPlacing] = useState(false);
+  const [userEwallets, setUserEwallets] = useState([]);
+  const [shippingAddress, setShippingAddress] = useState({
+    fullName: "",
+    phoneNumber: "",
+    address: "",
+    city: ""
+  });
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const orderItems = [
-    {
-      id: 1,
-      name: "Organic Tomatoes",
-      quantity: 2,
-      price: 8.99,
-      image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=100&h=100&fit=crop&crop=center"
-    },
-    {
-      id: 2,
-      name: "Fresh Herbs Bundle",
-      quantity: 1,
-      price: 15.99,
-      image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=100&h=100&fit=crop&crop=center"
-    }
-  ];
+  // Fetch cart data and user's ewallets
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!auth.isAuthenticated()) {
+        navigate('/login');
+        return;
+      }
 
-  const couriers = [
-    {
-      id: "spx",
-      name: "SPX Express",
-      price: 5.00,
-      time: "1-2 days",
-      rating: 4.8,
-      features: ["Real-time tracking", "Insurance coverage"]
-    },
-    {
-      id: "jnt",
-      name: "J&T Express",
-      price: 4.50,
-      time: "2-3 days",
-      rating: 4.6,
-      features: ["Affordable rates", "Wide coverage"]
-    },
-    {
-      id: "lbc",
-      name: "LBC Express",
-      price: 6.00,
-      time: "Same day",
-      rating: 4.9,
-      features: ["Same day delivery", "Premium service"]
-    }
-  ];
+      try {
+        setLoading(true);
+        
+        // Fetch cart
+        const cartResponse = await cartAPI.getCart();
+        if (cartResponse.success) {
+          setCartItems(cartResponse.cart || []);
+          
+          // If cart is empty, redirect to cart page
+          if (!cartResponse.cart || cartResponse.cart.length === 0) {
+            toast({
+              title: "Cart is empty",
+              description: "Please add items to your cart before checkout",
+              variant: "destructive",
+            });
+            navigate('/cart');
+            return;
+          }
+        }
 
-  const subtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const selectedCourierData = couriers.find(c => c.id === selectedCourier);
-  const shipping = selectedCourierData?.price || 0;
+        // Fetch user's linked ewallets
+        try {
+          const walletResponse = await walletAPI.getWallet();
+          if (walletResponse.success && walletResponse.data.ewallets) {
+            setUserEwallets(walletResponse.data.ewallets);
+          }
+        } catch (error) {
+          console.error('Error fetching ewallets:', error);
+          // Not critical, user can still use COD
+        }
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load checkout data",
+          variant: "destructive",
+        });
+        navigate('/cart');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [navigate, toast]);
+
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.product.productPrice * item.quantity), 0);
+  const shipping = 5.00; // Fixed shipping fee for now
   const total = subtotal + shipping;
+
+  const handleAddressChange = (field: string, value: string) => {
+    setShippingAddress(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handlePaymentMethodChange = (method: string) => {
+    if (method === 'cod') {
+      setPaymentMethod({ type: 'cod' });
+    } else {
+      // method is ewallet ID
+      const selectedWallet = userEwallets.find(wallet => wallet._id === method);
+      if (selectedWallet) {
+        setPaymentMethod({
+          type: 'ewallet',
+          ewalletDetails: {
+            ewalletId: selectedWallet._id,
+            accountNumber: selectedWallet.AccountNumer,
+            ewalletType: selectedWallet.EwalletType
+          }
+        });
+      }
+    }
+  };
+
+  const validateForm = () => {
+    if (!shippingAddress.fullName || !shippingAddress.phoneNumber || 
+        !shippingAddress.address || !shippingAddress.city) {
+      toast({
+        title: "Incomplete address",
+        description: "Please fill in all shipping address fields",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (paymentMethod.type === 'ewallet' && !paymentMethod.ewalletDetails?.ewalletId) {
+      toast({
+        title: "Payment method required",
+        description: "Please select an e-wallet for payment",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  const handlePlaceOrder = async () => {
+    if (!validateForm()) return;
+
+    setPlacing(true);
+    try {
+      const orderData = {
+        shippingAddress,
+        shippingFee: shipping,
+        paymentMethod
+      };
+
+      const response = await orderAPI.createOrder(orderData);
+      
+      if (response.success) {
+        toast({
+          title: "Order placed successfully!",
+          description: `Your order #${response.data._id.slice(-8)} has been placed`,
+        });
+        // Navigate to order tracking with the order ID
+        navigate(`/order-tracking/${response.data._id}`);
+      } else {
+        toast({
+          title: "Failed to place order",
+          description: response.message || "Something went wrong",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error placing order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to place order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setPlacing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <p className="text-center text-gray-600">Loading checkout...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,59 +219,47 @@ const Checkout = () => {
                     <MapPin className="w-5 h-5 mr-2 text-red-600" />
                     Delivery Address
                   </h2>
-                  <Button variant="outline" size="sm">Edit</Button>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="font-medium">John Doe</p>
-                  <p className="text-sm text-gray-600">+63 912 345 6789</p>
-                  <p className="text-sm text-gray-600">123 Sample Street, Barangay Sample, Manila City, Metro Manila, 1000</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Courier Selection */}
-            <Card>
-              <CardContent className="p-6">
-                <h2 className="text-lg font-semibold flex items-center mb-4">
-                  <Truck className="w-5 h-5 mr-2 text-red-600" />
-                  Choose Courier
-                </h2>
-                <RadioGroup value={selectedCourier} onValueChange={setSelectedCourier}>
-                  <div className="space-y-3">
-                    {couriers.map((courier) => (
-                      <div key={courier.id} className="flex items-center space-x-3 p-4 border rounded-lg hover:bg-gray-50">
-                        <RadioGroupItem value={courier.id} id={courier.id} />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <Label htmlFor={courier.id} className="font-medium cursor-pointer">
-                              {courier.name}
-                            </Label>
-                            <div className="flex items-center space-x-2">
-                              <div className="flex items-center space-x-1">
-                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                <span className="text-xs text-gray-600">{courier.rating}</span>
-                              </div>
-                              <span className="font-bold text-red-600">₱{courier.price.toFixed(2)}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-1 text-xs text-gray-600">
-                              <Clock className="w-3 h-3" />
-                              <span>{courier.time}</span>
-                            </div>
-                            <div className="flex space-x-1">
-                              {courier.features.map((feature, index) => (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  {feature}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName">Full Name</Label>
+                      <Input
+                        id="fullName"
+                        value={shippingAddress.fullName}
+                        onChange={(e) => handleAddressChange('fullName', e.target.value)}
+                        placeholder="Enter your full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phoneNumber">Phone Number</Label>
+                      <Input
+                        id="phoneNumber"
+                        value={shippingAddress.phoneNumber}
+                        onChange={(e) => handleAddressChange('phoneNumber', e.target.value)}
+                        placeholder="Enter your phone number"
+                      />
+                    </div>
                   </div>
-                </RadioGroup>
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input
+                      id="address"
+                      value={shippingAddress.address}
+                      onChange={(e) => handleAddressChange('address', e.target.value)}
+                      placeholder="Enter your street address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input
+                      id="city"
+                      value={shippingAddress.city}
+                      onChange={(e) => handleAddressChange('city', e.target.value)}
+                      placeholder="Enter your city"
+                    />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -153,8 +270,12 @@ const Checkout = () => {
                   <CreditCard className="w-5 h-5 mr-2 text-red-600" />
                   Payment Method
                 </h2>
-                <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
+                <RadioGroup 
+                  value={paymentMethod.type === 'cod' ? 'cod' : paymentMethod.ewalletDetails?.ewalletId} 
+                  onValueChange={handlePaymentMethodChange}
+                >
                   <div className="space-y-3">
+                    {/* Cash on Delivery */}
                     <div className="flex items-center space-x-3 p-4 border rounded-lg">
                       <RadioGroupItem value="cod" id="cod" />
                       <Label htmlFor="cod" className="flex-1 cursor-pointer">
@@ -165,13 +286,37 @@ const Checkout = () => {
                         <p className="text-sm text-gray-600">Pay when your order arrives</p>
                       </Label>
                     </div>
-                    <div className="flex items-center space-x-3 p-4 border rounded-lg">
-                      <RadioGroupItem value="gcash" id="gcash" />
-                      <Label htmlFor="gcash" className="flex-1 cursor-pointer">
-                        <span className="font-medium">GCash</span>
-                        <p className="text-sm text-gray-600">Pay securely with GCash</p>
-                      </Label>
-                    </div>
+
+                    {/* E-wallets */}
+                    {userEwallets.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700">Your Linked E-wallets:</p>
+                        {userEwallets.map((wallet) => (
+                          <div key={wallet._id} className="flex items-center space-x-3 p-4 border rounded-lg">
+                            <RadioGroupItem value={wallet._id} id={wallet._id} />
+                            <Label htmlFor={wallet._id} className="flex-1 cursor-pointer">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">
+                                  {wallet.EwalletType.toUpperCase()} - {wallet.AccountHolderName}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {wallet.EwalletType}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-gray-600">
+                                Account: {wallet.AccountNumer} • Balance: ₱{wallet.AccountBalance.toFixed(2)}
+                              </p>
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {userEwallets.length === 0 && (
+                      <div className="p-4 bg-gray-50 rounded-lg text-center">
+                        <p className="text-sm text-gray-600">No e-wallets linked. You can use Cash on Delivery.</p>
+                      </div>
+                    )}
                   </div>
                 </RadioGroup>
               </CardContent>
@@ -186,18 +331,19 @@ const Checkout = () => {
                 
                 {/* Order Items */}
                 <div className="space-y-3 mb-4">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex items-center space-x-3">
+                  {cartItems.map((item) => (
+                    <div key={item._id} className="flex items-center space-x-3">
                       <img 
-                        src={item.image}
-                        alt={item.name}
+                        src={item.product.productimage && item.product.productimage.length > 0 ? 
+                             item.product.productimage[0].url : "/placeholder.svg"}
+                        alt={item.product.productName}
                         className="w-12 h-12 object-cover rounded"
                       />
                       <div className="flex-1">
-                        <p className="font-medium text-sm">{item.name}</p>
+                        <p className="font-medium text-sm">{item.product.productName}</p>
                         <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
                       </div>
-                      <span className="font-medium">₱{(item.price * item.quantity).toFixed(2)}</span>
+                      <span className="font-medium">₱{(item.product.productPrice * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
                 </div>
@@ -211,7 +357,7 @@ const Checkout = () => {
                     <span>₱{subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span>Shipping ({selectedCourierData?.name})</span>
+                    <span>Shipping</span>
                     <span>₱{shipping.toFixed(2)}</span>
                   </div>
                   <Separator />
@@ -220,12 +366,25 @@ const Checkout = () => {
                     <span className="text-red-600">₱{total.toFixed(2)}</span>
                   </div>
                 </div>
+
+                {/* Payment Method Summary */}
+                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-medium">Payment Method:</p>
+                  <p className="text-sm text-gray-600">
+                    {paymentMethod.type === 'cod' ? 
+                      'Cash on Delivery' : 
+                      `${paymentMethod.ewalletDetails?.ewalletType?.toUpperCase()} - ${paymentMethod.ewalletDetails?.accountNumber}`
+                    }
+                  </p>
+                </div>
                 
-                <Link to="/order-tracking">
-                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white py-3 mb-4">
-                    Place Order
-                  </Button>
-                </Link>
+                <Button 
+                  onClick={handlePlaceOrder}
+                  disabled={placing}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-3 mb-4"
+                >
+                  {placing ? "Placing Order..." : "Place Order"}
+                </Button>
                 
                 <div className="flex items-center justify-center text-xs text-gray-500">
                   <Shield className="w-3 h-3 mr-1" />

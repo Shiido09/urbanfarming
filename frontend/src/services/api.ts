@@ -215,6 +215,29 @@ export const cartAPI = {
   },
 };
 
+// Order API calls
+export const orderAPI = {
+  createOrder: async (orderData) => {
+    const response = await api.post('/orders', orderData);
+    return response.data;
+  },
+
+  getUserOrders: async () => {
+    const response = await api.get('/orders/my-orders');
+    return response.data;
+  },
+
+  getOrderById: async (orderId) => {
+    const response = await api.get(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  updateOrderStatus: async (orderId, statusData) => {
+    const response = await api.put(`/orders/${orderId}/status`, statusData);
+    return response.data;
+  },
+};
+
 // Auth helper functions
 export const auth = {
   // Save user data and token to localStorage
