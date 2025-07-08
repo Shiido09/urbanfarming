@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const cron = require('node-cron');
 require('dotenv').config();
 const connectDB = require('./config/database');
+const { softDeleteExpiredProducts } = require('./utils/productUtils');
 
 // Import routes
 const userRoutes = require('./routes/userRoutes');
@@ -61,4 +63,19 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on http://0.0.0.0:${PORT}`);
   console.log(`Network access: http://192.168.1.9:${PORT}`);
+  
+  // Schedule task to check for expired products every hour
+  cron.schedule('0 * * * *', async () => {
+    console.log('Running scheduled task: Checking for expired products...');
+    try {
+      const deletedCount = await softDeleteExpiredProducts();
+      if (deletedCount > 0) {
+        console.log(`Automatically soft deleted ${deletedCount} expired products`);
+      }
+    } catch (error) {
+      console.error('Error in scheduled task:', error);
+    }
+  });
+  
+  console.log('Scheduled task set up: Checking for expired products every hour');
 });

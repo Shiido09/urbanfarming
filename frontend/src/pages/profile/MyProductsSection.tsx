@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { productsAPI } from "@/services/api";
-import { Plus, Edit, Trash2, Package, Calendar, DollarSign, Image, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, Package, Calendar, DollarSign, Image, Upload, AlertTriangle } from "lucide-react";
 
 const MyProductsSection = () => {
   const [products, setProducts] = useState([]);
@@ -173,6 +173,31 @@ const MyProductsSection = () => {
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
+  };
+
+  const isProductExpired = (product) => {
+    return new Date(product.productExpiryDate) < new Date();
+  };
+
+  const getProductStatus = (product) => {
+    if (product.isDeleted) {
+      switch (product.deletionReason) {
+        case 'expired':
+          return { status: 'Expired', color: 'bg-red-100 text-red-800', reason: 'Product expired automatically' };
+        case 'user_deleted':
+          return { status: 'Deleted', color: 'bg-gray-100 text-gray-800', reason: 'Deleted by user' };
+        case 'admin_deleted':
+          return { status: 'Removed', color: 'bg-orange-100 text-orange-800', reason: 'Removed by administrator' };
+        default:
+          return { status: 'Deleted', color: 'bg-gray-100 text-gray-800', reason: 'Product deleted' };
+      }
+    }
+    
+    if (isProductExpired(product)) {
+      return { status: 'Expired', color: 'bg-red-100 text-red-800', reason: 'Product has expired' };
+    }
+    
+    return { status: 'Active', color: 'bg-green-100 text-green-800', reason: null };
   };
 
   if (loading) {
@@ -356,30 +381,48 @@ const MyProductsSection = () => {
         </Card>
       ) : (
         <div className="grid gap-6">
-          {products.map((product) => (
-            <Card key={product._id} className="overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex gap-6">
+          {products.map((product) => {
+            const productStatus = getProductStatus(product);
+            const isInactive = product.isDeleted || isProductExpired(product);
+            
+            return (
+              <Card 
+                key={product._id} 
+                className={`overflow-hidden transition-all ${
+                  isInactive 
+                    ? 'border-red-200 bg-red-50/30' 
+                    : 'border-gray-200 hover:shadow-md'
+                }`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex gap-6">
                   {/* Product Images */}
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 relative">
                     {product.productimage && product.productimage.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2 w-40">
                         {product.productimage.slice(0, 4).map((image, index) => (
-                          <img
-                            key={index}
-                            src={image.url}
-                            alt={`${product.productName} ${index + 1}`}
-                            className="w-full h-16 object-cover rounded-lg"
-                          />
+                          <div key={index} className="relative">
+                            <img
+                              src={image.url}
+                              alt={`${product.productName} ${index + 1}`}
+                              className={`w-full h-16 object-cover rounded-lg ${
+                                isInactive ? 'grayscale opacity-60' : ''
+                              }`}
+                            />
+                          </div>
                         ))}
                         {product.productimage.length > 4 && (
-                          <div className="w-full h-16 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                          <div className={`w-full h-16 bg-gray-100 rounded-lg flex items-center justify-center text-xs text-gray-500 ${
+                            isInactive ? 'grayscale opacity-60' : ''
+                          }`}>
                             +{product.productimage.length - 4} more
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className="w-40 h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <div className={`w-40 h-32 bg-gray-100 rounded-lg flex items-center justify-center ${
+                        isInactive ? 'grayscale opacity-60' : ''
+                      }`}>
                         <Image className="w-8 h-8 text-gray-400" />
                       </div>
                     )}
@@ -389,12 +432,26 @@ const MyProductsSection = () => {
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          {product.productName}
-                        </h3>
-                        <Badge variant="outline" className="mt-1 capitalize">
-                          {product.productCategory}
-                        </Badge>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-semibold text-gray-800">
+                            {product.productName}
+                          </h3>
+                          <Badge 
+                            className={`${getProductStatus(product).color} text-xs font-medium`}
+                          >
+                            {getProductStatus(product).status}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="capitalize">
+                            {product.productCategory}
+                          </Badge>
+                          {getProductStatus(product).reason && (
+                            <span className="text-xs text-red-600 italic">
+                              {getProductStatus(product).reason}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       
                       <div className="flex space-x-2">
@@ -402,6 +459,8 @@ const MyProductsSection = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleEdit(product)}
+                          disabled={product.isDeleted || isProductExpired(product)}
+                          className={product.isDeleted || isProductExpired(product) ? 'opacity-50 cursor-not-allowed' : ''}
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
@@ -409,7 +468,8 @@ const MyProductsSection = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleDelete(product._id)}
-                          className="text-red-600 hover:text-red-700"
+                          disabled={product.isDeleted}
+                          className={`text-red-600 hover:text-red-700 ${product.isDeleted ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -440,11 +500,23 @@ const MyProductsSection = () => {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Calendar className="w-4 h-4 text-orange-600" />
+                        <Calendar className={`w-4 h-4 ${
+                          isProductExpired(product) ? 'text-red-600' : 'text-orange-600'
+                        }`} />
                         <div>
-                          <p className="text-sm text-gray-500">Expires</p>
-                          <p className="font-semibold">
+                          <div className="flex items-center gap-1">
+                            <p className="text-sm text-gray-500">Expires</p>
+                            {isProductExpired(product) && (
+                              <AlertTriangle className="w-3 h-3 text-red-600" />
+                            )}
+                          </div>
+                          <p className={`font-semibold ${
+                            isProductExpired(product) ? 'text-red-600' : ''
+                          }`}>
                             {formatDate(product.productExpiryDate)}
+                            {isProductExpired(product) && (
+                              <span className="text-xs ml-1">(Expired)</span>
+                            )}
                           </p>
                         </div>
                       </div>
@@ -460,7 +532,8 @@ const MyProductsSection = () => {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

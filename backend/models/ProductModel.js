@@ -85,6 +85,19 @@ const productSchema = new mongoose.Schema({
     totalSold: {
         type: Number,
         default: 0
+    },
+    isDeleted: {
+        type: Boolean,
+        default: false
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    deletionReason: {
+        type: String,
+        enum: ['expired', 'user_deleted', 'admin_deleted'],
+        default: null
     }
 });
 

@@ -1,10 +1,20 @@
 const Product = require('../models/ProductModel');
 const cloudinary = require('../config/cloudinary');
+const { softDeleteExpiredProducts } = require('../utils/productUtils');
 
 // Get all products
 const getAllProducts = async (req, res) => {
     try {
-        const products = await Product.find().populate('user', 'name email').sort({ createdAt: -1 });
+        // Run soft delete check for expired products before fetching
+        await softDeleteExpiredProducts();
+        
+        // Only fetch products that are not soft deleted (include products where isDeleted doesn't exist or is false)
+        const products = await Product.find({ 
+            $or: [
+                { isDeleted: { $exists: false } },
+                { isDeleted: false }
+            ]
+        }).populate('user', 'name email').sort({ createdAt: -1 });
         res.status(200).json({
             success: true,
             data: products
@@ -21,7 +31,13 @@ const getAllProducts = async (req, res) => {
 // Get single product by ID
 const getProductById = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id).populate('user', 'name email');
+        const product = await Product.findOne({ 
+            _id: req.params.id, 
+            $or: [
+                { isDeleted: { $exists: false } },
+                { isDeleted: false }
+            ]
+        }).populate('user', 'name email');
         
         if (!product) {
             return res.status(404).json({
@@ -46,6 +62,10 @@ const getProductById = async (req, res) => {
 // Get current user's products
 const getMyProducts = async (req, res) => {
     try {
+        // Run soft delete check for expired products before fetching
+        await softDeleteExpiredProducts();
+        
+        // Get all products (including soft deleted) for the user so they can see expired products
         const products = await Product.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.status(200).json({
             success: true,
