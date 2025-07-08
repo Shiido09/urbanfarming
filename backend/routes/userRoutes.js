@@ -6,6 +6,7 @@ const {
     loginUser,
     getUserProfile,
     updateUserProfile,
+    updateProfilePicture,
     changePassword,
     deleteUser,
     getAllUsers,
@@ -62,6 +63,7 @@ router.post('/login', loginUser);
 // Protected routes - User authentication required
 router.get('/profile', authenticateUser, getUserProfile);
 router.put('/profile', authenticateUser, updateUserProfile);
+router.put('/profile-picture', authenticateUser, upload.single('profilePicture'), updateProfilePicture);
 router.put('/change-password', authenticateUser, changePassword);
 
 // Wallet routes

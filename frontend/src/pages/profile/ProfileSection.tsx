@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { authAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import { Camera, Upload } from "lucide-react";
 
 const ProfileSection = () => {
   const { user, updateUser } = useAuth();
@@ -23,6 +24,9 @@ const ProfileSection = () => {
   });
   const [loading, setLoading] = useState(false);
   const [fetchingProfile, setFetchingProfile] = useState(!user); // Only show loading if no user data
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
 
   // Pre-populate form with user data from auth context and fetch latest data
   useEffect(() => {
@@ -73,11 +77,83 @@ const ProfileSection = () => {
     fetchUserProfile();
   }, [user, updateUser, toast]);
 
+  // Cleanup preview URL when component unmounts or preview changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   const handleInputChange = (name: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setProfileImageFile(file);
+      
+      // Create preview URL
+      const preview = URL.createObjectURL(file);
+      setPreviewUrl(preview);
+    }
+  };
+
+  const uploadProfileImage = async () => {
+    if (!profileImageFile) return null;
+
+    setUploadingImage(true);
+    try {
+      const formData = new FormData();
+      formData.append('profilePicture', profileImageFile);
+
+      const response = await authAPI.updateProfilePicture(formData);
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Profile picture updated successfully",
+        });
+        updateUser(response.data.user);
+        setProfileImageFile(null);
+        setPreviewUrl(null);
+        return response.data.user.profilePicture;
+      }
+    } catch (error: any) {
+      console.error('Error uploading profile picture:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to upload profile picture",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,19 +197,75 @@ const ProfileSection = () => {
       
       {/* Profile Picture Section */}
       <div className="flex items-center space-x-4 mb-6">
-        <Avatar className="w-20 h-20">
-          <AvatarImage 
-            src={user?.profilePicture?.url || "/placeholder.svg"} 
-            alt={user?.name || "Profile"} 
-          />
-          <AvatarFallback className="bg-farm-red-600 text-white text-lg">
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-          </AvatarFallback>
-        </Avatar>
-        <div>
+        <div className="relative">
+          <Avatar className="w-20 h-20">
+            <AvatarImage 
+              src={previewUrl || user?.profilePicture?.url || "/placeholder.svg"} 
+              alt={user?.name || "Profile"} 
+            />
+            <AvatarFallback className="bg-farm-red-600 text-white text-lg">
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            </AvatarFallback>
+          </Avatar>
+          
+          {/* Upload Button Overlay */}
+          <div className="absolute -bottom-2 -right-2">
+            <label htmlFor="profile-picture-upload" className="cursor-pointer">
+              <div className="bg-farm-red-600 hover:bg-farm-red-700 text-white rounded-full p-2 shadow-lg transition-colors">
+                <Camera className="w-4 h-4" />
+              </div>
+            </label>
+            <input
+              id="profile-picture-upload"
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
+          </div>
+        </div>
+        
+        <div className="flex-1">
           <h3 className="text-lg font-semibold text-gray-800">{user?.name}</h3>
           <p className="text-sm text-gray-600">Member since {user?.createdAt ? new Date(user.createdAt).getFullYear() : 'N/A'}</p>
           <p className="text-sm text-gray-600">Wallet Balance: ${user?.defaultWallet || 0}</p>
+          
+          {/* Profile Picture Actions */}
+          {profileImageFile && (
+            <div className="flex items-center gap-2 mt-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={uploadProfileImage}
+                disabled={uploadingImage}
+                className="bg-farm-red-600 hover:bg-farm-red-700 text-white"
+              >
+                {uploadingImage ? (
+                  <>
+                    <Upload className="w-3 h-3 mr-1 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-3 h-3 mr-1" />
+                    Save Picture
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setProfileImageFile(null);
+                  setPreviewUrl(null);
+                }}
+                disabled={uploadingImage}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

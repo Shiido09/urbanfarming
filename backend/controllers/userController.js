@@ -1135,6 +1135,57 @@ const clearCart = async (req, res) => {
     }
 };
 
+// Update User Profile Picture
+const updateProfilePicture = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: 'No profile picture file provided'
+            });
+        }
+
+        // Find user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Create profile picture object
+        const profilePicture = {
+            public_id: req.file.public_id || req.file.filename,
+            url: req.file.secure_url || req.file.path
+        };
+
+        // Update user's profile picture
+        user.profilePicture = profilePicture;
+        await user.save();
+
+        // Remove password from response
+        const userResponse = user.toObject();
+        delete userResponse.password;
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile picture updated successfully',
+            data: { user: userResponse }
+        });
+
+    } catch (error) {
+        console.error('Update profile picture error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error updating profile picture'
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -1156,5 +1207,6 @@ module.exports = {
     getCart,
     updateCartItem,
     removeFromCart,
-    clearCart
+    clearCart,
+    updateProfilePicture
 };
