@@ -7,20 +7,22 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import ProductDetailDialog from "@/components/ProductDetailDialog";
-import { ShoppingCart, Star, Filter, Search, Heart, ChevronDown, Eye } from "lucide-react";
+import { ShoppingCart, Star, Filter, Search, ChevronDown, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
-import { productsAPI } from "@/services/api";
+import { productsAPI, cartAPI } from "@/services/api";
+import { auth } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Shop = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [addingToCart, setAddingToCart] = useState(null);
-  const [favorites, setFavorites] = useState(new Set());
   const [selectedCategories, setSelectedCategories] = useState(new Set(["fruits"]));
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState({});
+  const { toast } = useToast();
 
   // Helper function to render stars
   const renderStars = (rating) => {
@@ -95,25 +97,49 @@ const Shop = () => {
     }
   };
 
-  const handleAddToCart = (e, productId) => {
+  const handleAddToCart = async (e, productId) => {
     e.stopPropagation();
+    
+    // Check if user is logged in
+    if (!auth.isAuthenticated()) {
+      toast({
+        title: "Login Required",
+        description: "Please login to add items to cart",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setAddingToCart(productId);
     
-    setTimeout(() => {
-      setAddingToCart(null);
-      console.log(`Added product ${productId} to cart`);
-    }, 1000);
-  };
-
-  const toggleFavorite = (e, productId) => {
-    e.stopPropagation();
-    const newFavorites = new Set(favorites);
-    if (newFavorites.has(productId)) {
-      newFavorites.delete(productId);
-    } else {
-      newFavorites.add(productId);
+    try {
+      const response = await cartAPI.addToCart(productId, 1);
+      
+      if (response.success) {
+        toast({
+          title: "Success!",
+          description: "Product added to cart successfully",
+        });
+      } else {
+        console.error('Failed to add to cart:', response.message);
+        toast({
+          title: "Error",
+          description: "Failed to add item to cart",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast({
+        title: "Error",
+        description: "Error adding item to cart",
+        variant: "destructive",
+      });
+    } finally {
+      setTimeout(() => {
+        setAddingToCart(null);
+      }, 1000);
     }
-    setFavorites(newFavorites);
   };
 
   const toggleCategory = (category) => {
@@ -220,17 +246,6 @@ const Shop = () => {
                         ))}
                       </div>
                     )}
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`absolute top-2 right-2 p-1 h-8 w-8 rounded-full ${
-                        favorites.has(product._id) ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-600'
-                      }`}
-                      onClick={(e) => toggleFavorite(e, product._id)}
-                    >
-                      <Heart className={`w-4 h-4 ${favorites.has(product._id) ? 'fill-current' : ''}`} />
-                    </Button>
                     
                     {/* Category badge */}
                     <div className="absolute top-2 left-2 bg-white/90 px-2 py-1 rounded-full">

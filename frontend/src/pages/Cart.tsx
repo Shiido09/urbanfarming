@@ -5,66 +5,154 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { cartAPI, auth } from "@/services/api";
+import { useToast } from "@/hooks/use-toast";
 
 const Cart = () => {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      name: "Organic Tomatoes",
-      price: 8.99,
-      quantity: 2,
-      image: "https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop&crop=center",
-      farmer: "Sarah's Garden"
-    },
-    {
-      id: 2,
-      name: "Fresh Herbs Bundle",
-      price: 15.99,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=300&h=300&fit=crop&crop=center",
-      farmer: "Green Thumb Co."
-    },
-    {
-      id: 3,
-      name: "Mixed Vegetables",
-      price: 22.50,
-      quantity: 1,
-      image: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=300&h=300&fit=crop&crop=center",
-      farmer: "Urban Harvest"
-    }
-  ]);
+  const [cartItems, setCartItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(null);
+  const { toast } = useToast();
 
-  const updateQuantity = (id: number, newQuantity: number) => {
+  // Fetch cart data from backend
+  useEffect(() => {
+    const fetchCart = async () => {
+      if (!auth.isAuthenticated()) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await cartAPI.getCart();
+        if (response.success) {
+          setCartItems(response.cart || []);
+        }
+      } catch (error) {
+        console.error('Error fetching cart:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load cart items",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCart();
+  }, []);
+
+  const updateQuantity = async (productId: string, newQuantity: number) => {
     if (newQuantity === 0) {
-      setCartItems(cartItems.filter(item => item.id !== id));
-    } else {
-      setCartItems(cartItems.map(item => 
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      ));
+      removeItem(productId);
+      return;
+    }
+
+    setUpdating(productId);
+    try {
+      const response = await cartAPI.updateCartItem(productId, newQuantity);
+      if (response.success) {
+        setCartItems(cartItems.map(item => 
+          item.product._id === productId ? { ...item, quantity: newQuantity } : item
+        ));
+        toast({
+          title: "Success",
+          description: "Cart updated successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error updating cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update cart",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(null);
     }
   };
 
-  const removeItem = (id: number) => {
-    setCartItems(cartItems.filter(item => item.id !== id));
+  const removeItem = async (productId: string) => {
+    setUpdating(productId);
+    try {
+      const response = await cartAPI.removeFromCart(productId);
+      if (response.success) {
+        setCartItems(cartItems.filter(item => item.product._id !== productId));
+        toast({
+          title: "Success",
+          description: "Item removed from cart",
+        });
+      }
+    } catch (error) {
+      console.error('Error removing item:', error);
+      toast({
+        title: "Error",
+        description: "Failed to remove item",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(null);
+    }
   };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.product.productPrice * item.quantity), 0);
   const shipping = 5.00;
   const total = subtotal + shipping;
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <section className="py-16 lg:py-24">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p className="text-gray-600">Loading cart...</p>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!auth.isAuthenticated()) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <section className="py-16 lg:py-24">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-6" />
+            <h1 className="text-3xl font-bold text-gray-800 mb-4">Please log in to view your cart</h1>
+            <p className="text-gray-600 mb-8">You need to be logged in to manage your cart items.</p>
+            <Link to="/login">
+              <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 mr-4">
+                Log In
+              </Button>
+            </Link>
+            <Link to="/shop">
+              <Button variant="outline" className="px-8 py-3">
+                Browse Products
+              </Button>
+            </Link>
+          </div>
+        </section>
+        <Footer />
+      </div>
+    );
+  }
+
   if (cartItems.length === 0) {
     return (
-      <div className="min-h-screen bg-farm-white-soft">
+      <div className="min-h-screen bg-gray-50">
         <Navigation />
         <section className="py-16 lg:py-24">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <ShoppingBag className="w-16 h-16 text-gray-400 mx-auto mb-6" />
             <h1 className="text-3xl font-bold text-gray-800 mb-4">Your cart is empty</h1>
             <p className="text-gray-600 mb-8">Add some fresh produce to get started!</p>
-            <Link to="/products">
-              <Button className="bg-farm-green-600 hover:bg-farm-green-700 text-white px-8 py-3">
+            <Link to="/shop">
+              <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3">
                 Browse Products
               </Button>
             </Link>
@@ -76,7 +164,7 @@ const Cart = () => {
   }
 
   return (
-    <div className="min-h-screen bg-farm-white-soft">
+    <div className="min-h-screen bg-gray-50">
       <Navigation />
       
       <section className="py-16 lg:py-24">
@@ -87,25 +175,33 @@ const Cart = () => {
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {cartItems.map((item) => (
-                <Card key={item.id} className="border-stone-200">
+                <Card key={item.product._id} className="border-gray-200">
                   <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row gap-4">
                       <img 
-                        src={item.image}
-                        alt={item.name}
+                        src={
+                          item.product.productimage && item.product.productimage.length > 0
+                            ? item.product.productimage[0].url
+                            : "https://images.unsplash.com/photo-1560493676-04071c5f467b?w=300&h=300&fit=crop&crop=center"
+                        }
+                        alt={item.product.productName}
                         className="w-full sm:w-24 h-32 sm:h-24 object-cover rounded-lg"
                       />
                       
                       <div className="flex-1">
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-800">{item.name}</h3>
-                            <p className="text-sm text-gray-600">by {item.farmer}</p>
+                            <h3 className="text-lg font-semibold text-gray-800">{item.product.productName}</h3>
+                            <p className="text-sm text-gray-600">by {item.product.user?.name || 'Unknown Seller'}</p>
+                            <Badge variant="secondary" className="mt-1">
+                              {item.product.productCategory}
+                            </Badge>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.product._id)}
+                            disabled={updating === item.product._id}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 self-start"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -117,8 +213,8 @@ const Cart = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                              disabled={item.quantity <= 1}
+                              onClick={() => updateQuantity(item.product._id, item.quantity - 1)}
+                              disabled={item.quantity <= 1 || updating === item.product._id}
                               className="w-8 h-8 p-0"
                             >
                               <Minus className="w-4 h-4" />
@@ -127,7 +223,8 @@ const Cart = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              onClick={() => updateQuantity(item.product._id, item.quantity + 1)}
+                              disabled={updating === item.product._id}
                               className="w-8 h-8 p-0"
                             >
                               <Plus className="w-4 h-4" />
@@ -136,10 +233,10 @@ const Cart = () => {
                           
                           <div className="text-right">
                             <p className="text-lg font-bold text-gray-800">
-                              ₱{(item.price * item.quantity).toFixed(2)}
+                              ₱{(item.product.productPrice * item.quantity).toFixed(2)}
                             </p>
                             <p className="text-sm text-gray-600">
-                              ₱{item.price.toFixed(2)} each
+                              ₱{item.product.productPrice.toFixed(2)} each
                             </p>
                           </div>
                         </div>
@@ -152,7 +249,7 @@ const Cart = () => {
 
             {/* Order Summary */}
             <div className="lg:col-span-1">
-              <Card className="border-stone-200 sticky top-4">
+              <Card className="border-gray-200 sticky top-4">
                 <CardContent className="p-6">
                   <h2 className="text-xl font-bold text-gray-800 mb-6">Order Summary</h2>
                   
@@ -165,7 +262,7 @@ const Cart = () => {
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-medium">₱{shipping.toFixed(2)}</span>
                     </div>
-                    <hr className="border-stone-200" />
+                    <hr className="border-gray-200" />
                     <div className="flex justify-between text-lg font-bold">
                       <span>Total</span>
                       <span>₱{total.toFixed(2)}</span>
@@ -173,13 +270,13 @@ const Cart = () => {
                   </div>
                   
                   <Link to="/checkout">
-                    <Button className="w-full bg-farm-green-600 hover:bg-farm-green-700 text-white py-3 mb-4">
+                    <Button className="w-full bg-red-600 hover:bg-red-700 text-white py-3 mb-4">
                       Proceed to Checkout
                     </Button>
                   </Link>
                   
-                  <Link to="/products">
-                    <Button variant="outline" className="w-full border-stone-300 text-gray-700 hover:bg-stone-50">
+                  <Link to="/shop">
+                    <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:bg-gray-50">
                       Continue Shopping
                     </Button>
                   </Link>

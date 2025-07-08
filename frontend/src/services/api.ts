@@ -187,6 +187,34 @@ export const productsAPI = {
   },
 };
 
+// Cart API calls
+export const cartAPI = {
+  addToCart: async (productId, quantity = 1) => {
+    const response = await api.post('/users/cart/add', { productId, quantity });
+    return response.data;
+  },
+
+  getCart: async () => {
+    const response = await api.get('/users/cart');
+    return response.data;
+  },
+
+  updateCartItem: async (productId, quantity) => {
+    const response = await api.put('/users/cart/update', { productId, quantity });
+    return response.data;
+  },
+
+  removeFromCart: async (productId) => {
+    const response = await api.delete(`/users/cart/remove/${productId}`);
+    return response.data;
+  },
+
+  clearCart: async () => {
+    const response = await api.delete('/users/cart/clear');
+    return response.data;
+  },
+};
+
 // Auth helper functions
 export const auth = {
   // Save user data and token to localStorage

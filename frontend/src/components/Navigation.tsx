@@ -1,18 +1,38 @@
 
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Heart, User, Menu, X, LogOut } from "lucide-react";
+import { ShoppingCart, User, Menu, X, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { auth } from "@/services/api";
+import { auth, cartAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
 const Navigation = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [cartCount, setCartCount] = useState(0);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Fetch cart count
+  const fetchCartCount = async () => {
+    if (!auth.isAuthenticated()) {
+      setCartCount(0);
+      return;
+    }
+
+    try {
+      const response = await cartAPI.getCart();
+      if (response.success && response.cart) {
+        const totalItems = response.cart.reduce((sum, item) => sum + item.quantity, 0);
+        setCartCount(totalItems);
+      }
+    } catch (error) {
+      console.error('Error fetching cart:', error);
+      setCartCount(0);
+    }
+  };
 
   useEffect(() => {
     // Check authentication status
@@ -21,6 +41,13 @@ const Navigation = () => {
       const userData = auth.getUserData();
       setIsAuthenticated(isAuth);
       setUser(userData);
+      
+      // Fetch cart count when authentication status changes
+      if (isAuth) {
+        fetchCartCount();
+      } else {
+        setCartCount(0);
+      }
     };
 
     checkAuth();
@@ -32,6 +59,13 @@ const Navigation = () => {
       window.removeEventListener('storage', checkAuth);
     };
   }, []);
+
+  // Refresh cart count when location changes (e.g., after adding to cart)
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchCartCount();
+    }
+  }, [location.pathname, isAuthenticated]);
 
   const handleLogout = () => {
     const userName = user?.name || 'User';
@@ -92,19 +126,18 @@ const Navigation = () => {
 
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <Link to="/favorites">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-red-600">
-                <Heart className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link to="/cart">
-              <Button variant="ghost" size="sm" className="text-gray-600 hover:text-red-600 relative">
-                <ShoppingCart className="w-5 h-5" />
-                <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-            </Link>
+            {isAuthenticated && (
+              <Link to="/cart">
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-red-600 relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                      {cartCount > 99 ? '99+' : cartCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            )}
             
             {isAuthenticated ? (
               <>
@@ -140,19 +173,18 @@ const Navigation = () => {
 
           {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center space-x-2">
-            <Link to="/favorites">
-              <Button variant="ghost" size="sm" className="text-gray-600">
-                <Heart className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link to="/cart">
-              <Button variant="ghost" size="sm" className="text-gray-600 relative">
-                <ShoppingCart className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  3
-                </span>
-              </Button>
-            </Link>
+            {isAuthenticated && (
+              <Link to="/cart">
+                <Button variant="ghost" size="sm" className="text-gray-600 relative">
+                  <ShoppingCart className="w-5 h-5" />
+                  {cartCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                      {cartCount > 9 ? '9+' : cartCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="sm"

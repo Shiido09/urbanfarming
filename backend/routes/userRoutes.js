@@ -17,7 +17,12 @@ const {
     disconnectEwallet,
     createEwalletAccount,
     getAvailableEwallets,
-    getEwalletsByType
+    getEwalletsByType,
+    addToCart,
+    getCart,
+    updateCartItem,
+    removeFromCart,
+    clearCart
 } = require('../controllers/userController');
 const {
     authenticateUser,
@@ -69,6 +74,13 @@ router.delete('/wallet/disconnect/:ewalletId', authenticateUser, disconnectEwall
 // E-wallet discovery routes
 router.get('/wallet/available-ewallets', authenticateUser, getAvailableEwallets);
 router.get('/wallet/ewallets/:type', authenticateUser, getEwalletsByType);
+
+// Cart routes
+router.post('/cart/add', authenticateUser, addToCart);
+router.get('/cart', authenticateUser, getCart);
+router.put('/cart/update', authenticateUser, updateCartItem);
+router.delete('/cart/remove/:productId', authenticateUser, removeFromCart);
+router.delete('/cart/clear', authenticateUser, clearCart);
 
 // Public route for creating e-wallet accounts (for demo purposes)
 router.post('/wallet/create-account', createEwalletAccount);

@@ -32,23 +32,6 @@ const OrderSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    review: {
-        rating: {
-            type: Number,
-            min: 1,
-            max: 5,
-            required: false
-        },
-        comment: {
-            type: String,
-            required: false,
-            maxlength: 500
-        },
-        reviewDate: {
-            type: Date,
-            required: false
-        }
-    }
 });
 
 const Order = mongoose.model('Order', OrderSchema);

@@ -925,6 +925,216 @@ const getEwalletsByType = async (req, res) => {
     }
 };
 
+// Cart functionality
+const addToCart = async (req, res) => {
+    try {
+        const { productId, quantity = 1 } = req.body;
+        const userId = req.user._id;
+
+        // Validate input
+        if (!productId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Product ID is required'
+            });
+        }
+
+        if (quantity < 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Quantity must be at least 1'
+            });
+        }
+
+        // Find the user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Check if product already exists in cart
+        const existingCartItem = user.cart.find(item => 
+            item.product.toString() === productId
+        );
+
+        if (existingCartItem) {
+            // Update quantity if product already in cart
+            existingCartItem.quantity += quantity;
+        } else {
+            // Add new item to cart
+            user.cart.push({
+                product: productId,
+                quantity: quantity
+            });
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Product added to cart successfully',
+            cart: user.cart
+        });
+
+    } catch (error) {
+        console.error('Add to cart error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while adding to cart'
+        });
+    }
+};
+
+const getCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId).populate({
+            path: 'cart.product',
+            select: 'productName productPrice productimage productCategory user',
+            populate: {
+                path: 'user',
+                select: 'name email'
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            cart: user.cart
+        });
+
+    } catch (error) {
+        console.error('Get cart error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while fetching cart'
+        });
+    }
+};
+
+const updateCartItem = async (req, res) => {
+    try {
+        const { productId, quantity } = req.body;
+        const userId = req.user._id;
+
+        if (!productId || quantity < 1) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid product ID and quantity are required'
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        const cartItem = user.cart.find(item => 
+            item.product.toString() === productId
+        );
+
+        if (!cartItem) {
+            return res.status(404).json({
+                success: false,
+                message: 'Product not found in cart'
+            });
+        }
+
+        cartItem.quantity = quantity;
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Cart item updated successfully',
+            cart: user.cart
+        });
+
+    } catch (error) {
+        console.error('Update cart item error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while updating cart item'
+        });
+    }
+};
+
+const removeFromCart = async (req, res) => {
+    try {
+        const { productId } = req.params;
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        user.cart = user.cart.filter(item => 
+            item.product.toString() !== productId
+        );
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Product removed from cart successfully',
+            cart: user.cart
+        });
+
+    } catch (error) {
+        console.error('Remove from cart error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while removing from cart'
+        });
+    }
+};
+
+const clearCart = async (req, res) => {
+    try {
+        const userId = req.user._id;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        user.cart = [];
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Cart cleared successfully',
+            cart: user.cart
+        });
+
+    } catch (error) {
+        console.error('Clear cart error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error while clearing cart'
+        });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
@@ -941,5 +1151,10 @@ module.exports = {
     disconnectEwallet,
     createEwalletAccount,
     getAvailableEwallets,
-    getEwalletsByType
+    getEwalletsByType,
+    addToCart,
+    getCart,
+    updateCartItem,
+    removeFromCart,
+    clearCart
 };
