@@ -24,6 +24,10 @@ const Shop = () => {
   const [currentImageIndex, setCurrentImageIndex] = useState({});
   const { toast } = useToast();
 
+  // Get current user data
+  const currentUser = auth.getUserData();
+  const isLoggedIn = auth.isAuthenticated();
+
   // Helper function to render stars
   const renderStars = (rating) => {
     const stars = [];
@@ -100,16 +104,6 @@ const Shop = () => {
   const handleAddToCart = async (e, productId) => {
     e.stopPropagation();
     
-    // Check if user is logged in
-    if (!auth.isAuthenticated()) {
-      toast({
-        title: "Login Required",
-        description: "Please login to add items to cart",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setAddingToCart(productId);
     
     try {
@@ -298,16 +292,40 @@ const Shop = () => {
                         View Product Details
                       </Button>
                       
-                      <Button 
-                        className={`w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 transition-all duration-300 transform ${
-                          addingToCart === product._id ? 'scale-95 bg-green-600 animate-pulse' : 'hover:scale-105'
-                        }`}
-                        onClick={(e) => handleAddToCart(e, product._id)}
-                        disabled={addingToCart === product._id || product.productStock === 0}
-                      >
-                        <ShoppingCart className={`w-4 h-4 mr-2 ${addingToCart === product._id ? 'animate-bounce' : ''}`} />
-                        {addingToCart === product._id ? 'Adding...' : product.productStock === 0 ? 'Out of Stock' : 'Add to Cart'}
-                      </Button>
+                      {/* Only show Add to Cart if user is logged in and not the product owner */}
+                      {isLoggedIn && currentUser?._id !== product.user?._id && (
+                        <Button 
+                          className={`w-full bg-red-600 hover:bg-red-700 text-white text-xs py-2 transition-all duration-300 transform ${
+                            addingToCart === product._id ? 'scale-95 bg-green-600 animate-pulse' : 'hover:scale-105'
+                          }`}
+                          onClick={(e) => handleAddToCart(e, product._id)}
+                          disabled={addingToCart === product._id || product.productStock === 0}
+                        >
+                          <ShoppingCart className={`w-4 h-4 mr-2 ${addingToCart === product._id ? 'animate-bounce' : ''}`} />
+                          {addingToCart === product._id ? 'Adding...' : product.productStock === 0 ? 'Out of Stock' : 'Add to Cart'}
+                        </Button>
+                      )}
+                      
+                      {/* Show message when user is not logged in */}
+                      {!isLoggedIn && (
+                        <Button 
+                          className="w-full bg-gray-400 text-white text-xs py-2 cursor-not-allowed"
+                          disabled
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-2" />
+                          Login to Add to Cart
+                        </Button>
+                      )}
+                      
+                      {/* Show message when user is the product owner */}
+                      {isLoggedIn && currentUser?._id === product.user?._id && (
+                        <Button 
+                          className="w-full bg-blue-600 text-white text-xs py-2 cursor-default"
+                          disabled
+                        >
+                          Your Product
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
