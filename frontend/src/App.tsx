@@ -27,6 +27,14 @@ import CreateWallet from "./pages/CreateWallet";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Community from "./pages/Community";
+import AdminDashboard from "./pages/admin/Dashboard";
+import AdminUsers from "./pages/admin/Users";
+import AdminOrders from "./pages/admin/Orders";
+import AdminProducts from "./pages/admin/Products";
+import AdminAnalytics from "./pages/admin/Analytics";
+import AdminMessages from "./pages/admin/Messages";
+import AdminSupport from "./pages/admin/Support";
+import AdminSettings from "./pages/admin/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +71,17 @@ const App = () => (
             <Route path="/profile/coins" element={<HarvestConnectCoins />} />
             <Route path="/create-wallet" element={<CreateWallet />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/orders" element={<AdminOrders />} />
+          <Route path="/admin/products" element={<AdminProducts />} />
+          <Route path="/admin/analytics" element={<AdminAnalytics />} />
+          <Route path="/admin/messages" element={<AdminMessages />} />
+          <Route path="/admin/support" element={<AdminSupport />} />
+          <Route path="/admin/settings" element={<AdminSettings />} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
