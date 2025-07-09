@@ -243,6 +243,60 @@ export const orderAPI = {
   },
 };
 
+// Forum API calls
+export const forumAPI = {
+  getAllPosts: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    const response = await api.get(`/forum?${queryString}`);
+    return response.data;
+  },
+
+  getPostById: async (postId) => {
+    const response = await api.get(`/forum/${postId}`);
+    return response.data;
+  },
+
+  createPost: async (postData) => {
+    const response = await api.post('/forum', postData);
+    return response.data;
+  },
+
+  updatePost: async (postId, postData) => {
+    const response = await api.put(`/forum/${postId}`, postData);
+    return response.data;
+  },
+
+  deletePost: async (postId) => {
+    const response = await api.delete(`/forum/${postId}`);
+    return response.data;
+  },
+
+  voteOnPost: async (postId, voteType) => {
+    const response = await api.post(`/forum/${postId}/vote`, { type: voteType });
+    return response.data;
+  },
+
+  addComment: async (postId, content) => {
+    const response = await api.post(`/forum/${postId}/comment`, { content });
+    return response.data;
+  },
+
+  getRecommendedPosts: async (limit = 5) => {
+    const response = await api.get(`/forum/recommended?limit=${limit}`);
+    return response.data;
+  },
+
+  getTrendingPosts: async (limit = 5) => {
+    const response = await api.get(`/forum/trending?limit=${limit}`);
+    return response.data;
+  },
+
+  getCommunityStats: async () => {
+    const response = await api.get('/forum/stats');
+    return response.data;
+  },
+};
+
 // Auth helper functions
 export const auth = {
   // Save user data and token to localStorage

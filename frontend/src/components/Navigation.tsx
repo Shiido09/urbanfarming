@@ -87,6 +87,7 @@ const Navigation = () => {
   const navItems = [
     { name: "Home", path: "/" },
     { name: "Shop", path: "/shop" },
+    { name: "Community", path: "/community" },
     { name: "About", path: "/about" },
     { name: "Contact", path: "/contact" },
   ];

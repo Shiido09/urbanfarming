@@ -62,9 +62,18 @@ const forumPostSchema = new mongoose.Schema({
             default: Date.now
         }
     }],
-    images: [{
-        type: String
-    }],
+    productimage: [
+    {
+        public_id: {
+        type: String,
+        required: false,
+        },
+        url: {
+        type: String,
+        required: false,
+        }
+    }
+    ],
     createdAt: {
         type: Date,
         default: Date.now

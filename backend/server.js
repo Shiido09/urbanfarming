@@ -9,6 +9,7 @@ const { softDeleteExpiredProducts } = require('./utils/productUtils');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoute');
 const orderRoutes = require('./routes/orderRoutes');
+const forumRoutes = require('./routes/forumRoutes');
 
 connectDB();
 
@@ -43,6 +44,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/forum', forumRoutes);
 
 const PORT = process.env.PORT || 5000;
 

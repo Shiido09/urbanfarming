@@ -26,6 +26,7 @@ import HarvestConnectCoins from "./pages/HarvestConnectCoins";
 import CreateWallet from "./pages/CreateWallet";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Community from "./pages/Community";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/store/:sellerId" element={<Store />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/community" element={<Community />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/order-tracking" element={<OrderTracking />} />
