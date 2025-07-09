@@ -198,13 +198,15 @@ const SucculentPlant = () => {
 
 const Seed3D = () => {
   return (
-    <div className="w-full h-full">
-      <Canvas camera={{ position: [0, 0, 1], fov: 50 }}>
+    <div className="w-full h-full flex items-center justify-center">
+      <Canvas camera={{ position: [0, 0.2, 1], fov: 50 }}>
         <ambientLight intensity={0.6} />
         <pointLight position={[5, 5, 5]} intensity={0.8} color="#ffffff" />
         <pointLight position={[-3, 3, -3]} intensity={0.4} color="#86efac" />
         <directionalLight position={[2, 4, 2]} intensity={0.7} castShadow />
-        <SucculentPlant />
+        <group position={[0, 0.15, 0]}>
+          <SucculentPlant />
+        </group>
         <OrbitControls enableZoom={false} enablePan={false} enableRotate={false} />
       </Canvas>
     </div>
